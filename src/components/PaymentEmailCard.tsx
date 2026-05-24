@@ -74,10 +74,10 @@ export function PaymentEmailCard({
     }
     if (lastAuthorRef.current === selected.id) return;
     lastAuthorRef.current = selected.id;
+    // title/publisher are no longer stored on Author (they are local form fields now).
+    // Only senderName auto-fills from headAgent.
     setForm((f) => ({
       ...f,
-      title: selected.title ?? "",
-      publisher: selected.publisher ?? "",
       senderName: selected.headAgent ?? "",
     }));
     setEmail(null);
@@ -113,7 +113,7 @@ export function PaymentEmailCard({
     }
     startTransition(() => {
       const body = buildPaymentEmail({
-        authorName: selected.name,
+        authorName: `${selected.firstName} ${selected.lastName}`.trim(),
         totalPayment: totalNumber,
         commissionType: form.commissionType,
         title: form.title,
@@ -210,7 +210,7 @@ export function PaymentEmailCard({
       />
 
       <div className="pt-1 flex items-center justify-between gap-4">
-        <div className="min-h-[1.25rem] text-[0.82rem] leading-tight">
+        <div className="min-h-[1.25rem] text-[0.92rem] leading-tight">
           <AnimatePresence mode="wait">
             {error && (
               <motion.span
@@ -243,7 +243,7 @@ export function PaymentEmailCard({
           onClick={onGenerate}
           disabled={!canGenerate}
           whileTap={{ scale: canGenerate ? 0.985 : 1 }}
-          className="group relative inline-flex items-center gap-2 px-5 py-2 text-[0.78rem] smallcaps text-paper bg-wine hover:bg-wine-deep transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="group relative inline-flex items-center gap-2 px-5 py-2.5 text-[0.85rem] smallcaps text-paper bg-wine hover:bg-wine-deep transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <span>{pending ? "Composing" : "Generate email"}</span>
           <span aria-hidden="true">→</span>
@@ -268,7 +268,7 @@ function SplitPreview({
     <motion.div
       layout
       transition={{ duration: 0.3, ease: [0.2, 0.6, 0.2, 1] }}
-      className="border-t border-rule pt-3 grid grid-cols-3 gap-4 text-[0.78rem]"
+      className="border-t border-rule pt-4 grid grid-cols-3 gap-4 text-[0.85rem]"
     >
       <Stat label="Total" value={total === null ? "—" : formatUSD(total)} />
       <Stat
@@ -302,7 +302,7 @@ function Stat({
         : "var(--color-ink)";
   return (
     <div>
-      <div className="smallcaps text-ink-muted text-[0.66rem]">{label}</div>
+      <div className="smallcaps text-ink-muted text-[0.74rem]">{label}</div>
       <AnimatePresence mode="wait" initial={false}>
         <motion.div
           key={value}
@@ -310,7 +310,7 @@ function Stat({
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -4 }}
           transition={{ duration: 0.24, ease: [0.2, 0.6, 0.2, 1] }}
-          className="font-serif text-[1.15rem] tabular-nums"
+          className="font-serif text-[1.3rem] tabular-nums"
           style={{ color }}
         >
           {value}
@@ -347,7 +347,7 @@ const EmailReveal = forwardRef<HTMLTextAreaElement, EmailRevealProps>(
                   className="inline-block w-1.5 h-1.5 rounded-full"
                   style={{ background: "var(--color-wine)" }}
                 />
-                <h3 className="smallcaps text-[0.72rem] text-ink-muted">
+                <h3 className="smallcaps text-[0.82rem] text-ink-muted">
                   Composed email
                 </h3>
               </div>
@@ -355,7 +355,7 @@ const EmailReveal = forwardRef<HTMLTextAreaElement, EmailRevealProps>(
                 type="button"
                 onClick={onCopy}
                 whileTap={{ scale: 0.985 }}
-                className="inline-flex items-center gap-2 px-3 py-1.5 text-[0.72rem] smallcaps border border-ink text-ink hover:bg-ink hover:text-paper transition-colors"
+                className="inline-flex items-center gap-2 px-3.5 py-2 text-[0.8rem] smallcaps border border-ink text-ink hover:bg-ink hover:text-paper transition-colors"
               >
                 <AnimatePresence mode="wait" initial={false}>
                   {copied ? (
@@ -401,10 +401,10 @@ const EmailReveal = forwardRef<HTMLTextAreaElement, EmailRevealProps>(
               animate={{ opacity: 1 }}
               transition={{ delay: 0.08, duration: 0.4 }}
               rows={Math.max(9, email.split("\n").length + 1)}
-              className="w-full bg-paper-soft border border-rule-soft px-4 py-4 font-serif text-[1.02rem] leading-[1.65] text-ink resize-none focus:outline-none focus:border-ink/60 transition-colors whitespace-pre-wrap"
+              className="w-full bg-paper-soft border border-rule-soft px-5 py-5 font-serif text-[1.12rem] leading-[1.7] text-ink resize-none focus:outline-none focus:border-ink/60 transition-colors whitespace-pre-wrap"
               spellCheck={false}
             />
-            <div className="mt-2 text-[0.7rem] italic text-ink-muted">
+            <div className="mt-2 text-[0.8rem] italic text-ink-muted">
               The text is yours to edit before pasting into your email client.
             </div>
           </motion.section>

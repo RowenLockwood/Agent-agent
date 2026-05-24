@@ -32,7 +32,7 @@ export const Field = forwardRef<HTMLInputElement, InputProps>(function Field(
     <div className="group relative pt-1">
       <label
         htmlFor={id}
-        className="smallcaps block text-[0.68rem] text-ink-muted mb-1.5 transition-colors duration-300"
+        className="smallcaps block text-[0.78rem] text-ink-muted mb-1.5 transition-colors duration-300"
         data-active={focused ? "true" : "false"}
         style={{ color: focused ? "var(--color-wine)" : undefined }}
       >
@@ -62,7 +62,7 @@ export const Field = forwardRef<HTMLInputElement, InputProps>(function Field(
           }}
           aria-required={required || undefined}
           className={
-            "w-full bg-transparent border-0 border-b border-rule px-0 py-1.5 text-[0.95rem] text-ink placeholder:text-ink-muted/50 focus:outline-none focus:ring-0 transition-colors " +
+            "w-full bg-transparent border-0 border-b border-rule px-0 py-2 text-[1.05rem] text-ink placeholder:text-ink-muted/50 focus:outline-none focus:ring-0 transition-colors " +
             (className ?? "")
           }
         />
@@ -91,7 +91,7 @@ export const Field = forwardRef<HTMLInputElement, InputProps>(function Field(
         </AnimatePresence>
       </div>
       {hint && (
-        <p className="mt-1 text-[0.72rem] text-ink-muted italic">{hint}</p>
+        <p className="mt-1.5 text-[0.82rem] text-ink-muted italic">{hint}</p>
       )}
     </div>
   );
@@ -111,7 +111,7 @@ export const SelectField = forwardRef<HTMLSelectElement, SelectProps>(
       <div className="group relative pt-1">
         <label
           htmlFor={id}
-          className="smallcaps block text-[0.68rem] text-ink-muted mb-1.5 transition-colors duration-300"
+          className="smallcaps block text-[0.78rem] text-ink-muted mb-1.5 transition-colors duration-300"
           style={{ color: focused ? "var(--color-wine)" : undefined }}
         >
           {label}
@@ -134,7 +134,7 @@ export const SelectField = forwardRef<HTMLSelectElement, SelectProps>(
               rest.onBlur?.(e);
             }}
             className={
-              "select-arrow w-full appearance-none bg-transparent border-0 border-b border-rule pl-0 pr-6 py-1.5 text-[0.95rem] text-ink focus:outline-none focus:ring-0 cursor-pointer " +
+              "select-arrow w-full appearance-none bg-transparent border-0 border-b border-rule pl-0 pr-6 py-2 text-[1.05rem] text-ink focus:outline-none focus:ring-0 cursor-pointer " +
               (className ?? "")
             }
           >
@@ -149,7 +149,7 @@ export const SelectField = forwardRef<HTMLSelectElement, SelectProps>(
           />
         </div>
         {hint && (
-          <p className="mt-1 text-[0.72rem] text-ink-muted italic">{hint}</p>
+          <p className="mt-1.5 text-[0.82rem] text-ink-muted italic">{hint}</p>
         )}
       </div>
     );

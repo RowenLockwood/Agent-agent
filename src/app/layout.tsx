@@ -19,21 +19,15 @@ const sans = Inter({
 
 export const metadata: Metadata = {
   title: "Plato — An Agent for Literary Agents",
-  description:
-    "An internal tool for literary agents. Save authors and compose payment emails.",
+  description: "Client library, submission tracking, and payment email tools for literary agents.",
 };
 
 export default function RootLayout({
   children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+}: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html
-      lang="en"
-      className={`${serif.variable} ${sans.variable} h-full antialiased`}
-    >
-      <body className="min-h-full flex flex-col bg-paper text-ink font-sans">
+    <html lang="en" className={`${serif.variable} ${sans.variable} h-full antialiased`}>
+      <body className="h-full font-sans overflow-hidden">
         {children}
       </body>
     </html>

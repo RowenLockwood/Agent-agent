@@ -1,5 +1,4 @@
 // Plato — Prisma schema
-// Learn more: https://pris.ly/d/prisma-schema
 
 generator client {
   provider = "prisma-client"
@@ -11,15 +10,52 @@ datasource db {
 }
 
 model Author {
-  id        String   @id @default(cuid())
-  name      String
-  email     String?
-  headAgent String?
-  title     String?
-  editor    String?
-  publisher String?
+  id                    String   @id @default(cuid())
+  firstName             String
+  lastName              String
+  email                 String?
+  headAgent             String?
+  headAgentEmail        String?
+  assignedAssistant     String?
+
+  // Author-level publishing pipeline stages
+  // Values: "not_started" | "in_progress" | "completed"
+  proposalSentToEditors String   @default("not_started")
+  authorMeetings        String   @default("not_started")
+  bidSent               String   @default("not_started")
+  dealMemoSent          String   @default("not_started")
+  dealMemoAccepted      String   @default("not_started")
+  paymentReceived       String   @default("not_started")
+  paymentSentToAuthor   String   @default("not_started")
+
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  editorOutreach        EditorOutreach[]
+
+  @@index([createdAt])
+}
+
+model EditorOutreach {
+  id          String  @id @default(cuid())
+  authorId    String
+  author      Author  @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  editorFirstName  String
+  editorLastName   String
+  editorEmail      String?
+  publishingHouse  String?
+
+  // Editor-level stage values — each stage has its own allowed set (see src/lib/stages.ts)
+  proposalStage            String @default("not_sent")
+  authorMeetingStage       String @default("not_sent")
+  bidStage                 String @default("not_sent")
+  dealMemoStage            String @default("not_sent")
+  paymentReceivedStage     String @default("not_received")
+  paymentSentToAuthorStage String @default("not_sent")
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@index([createdAt])
+  @@index([authorId])
 }
