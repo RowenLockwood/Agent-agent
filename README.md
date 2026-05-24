@@ -67,19 +67,27 @@ Open [http://localhost:3000](http://localhost:3000).
 
 ## Deploy to Vercel
 
-1. **Push the repo to GitHub** and import it into Vercel.
-2. **Set the `DATABASE_URL` environment variable** in Vercel (Project → Settings
-   → Environment Variables) to your Neon pooled connection string. Apply it to
-   Production, Preview, and Development.
-3. **Run the production migration** against your Neon database once:
-   ```bash
-   DATABASE_URL="postgresql://..." npm run db:deploy
-   ```
-   You can run this from your machine, or wire it into a Vercel build step.
-4. Deploy. The `postinstall` script runs `prisma generate` automatically.
+You can ship this without ever running anything on your machine.
 
-The Prisma client uses `@prisma/adapter-neon` (HTTP transport), so it works
-well in Vercel's serverless functions without any extra runtime configuration.
+1. **Create a Neon database** at [console.neon.tech](https://console.neon.tech)
+   (the free tier is plenty). Copy the connection string — the unpooled one
+   is recommended for migrations.
+2. **Push this repo to GitHub** (or merge the feature branch into `main`).
+3. **Import the repo into Vercel**: [vercel.com/new](https://vercel.com/new) →
+   pick your GitHub repo → keep all the defaults.
+4. **Add the environment variable**: in Vercel's project settings → Environment
+   Variables, add `DATABASE_URL` with your Neon connection string. Apply it
+   to Production, Preview, and Development.
+5. **Click Deploy.** Vercel runs the `vercel-build` script, which:
+   - generates the Prisma client (`prisma generate`)
+   - applies any pending migrations (`prisma migrate deploy`)
+   - builds the Next.js app (`next build`)
+
+   The migration is idempotent — every deploy re-checks `_prisma_migrations`
+   and applies anything new. The first deploy creates the `Author` table.
+
+The Prisma client uses `@prisma/adapter-neon` over HTTP, so it works
+well in Vercel's serverless functions with no extra runtime configuration.
 
 ## Scripts
 
