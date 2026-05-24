@@ -35,6 +35,7 @@ type FormState = {
   totalPayment: string;
   commissionRate: string;
   commissionType: CommissionType;
+  editorName: string;
   title: string;
   publisher: string;
   senderName: string;
@@ -44,6 +45,7 @@ const INITIAL: FormState = {
   totalPayment: "",
   commissionRate: "15",
   commissionType: "advance",
+  editorName: "",
   title: "",
   publisher: "",
   senderName: "",
@@ -82,6 +84,7 @@ export function PaymentEmailCard({
 
     setForm((f) => ({
       ...f,
+      editorName: "",
       title: selected.title,
       publisher: "",
       senderName: selected.headAgent,
@@ -103,7 +106,13 @@ export function PaymentEmailCard({
   function onEditorChange(id: string) {
     setSelectedEditorId(id);
     const editor = editors.find((e) => e.id === id);
-    setForm((f) => ({ ...f, publisher: editor ? editor.publishingHouse : "" }));
+    setForm((f) => ({
+      ...f,
+      editorName: editor
+        ? `${editor.editorFirstName} ${editor.editorLastName}`.trim()
+        : "",
+      publisher: editor ? editor.publishingHouse : "",
+    }));
     setEmail(null);
     if (error) setError(null);
   }
@@ -188,30 +197,40 @@ export function PaymentEmailCard({
         required
       />
 
-      <SelectField
-        label="Editor"
-        hint={
-          !selected
-            ? "Select an author first."
-            : editorsLoading
+      {selected && (editorsLoading || editors.length > 0) ? (
+        <SelectField
+          label="Editor"
+          hint={
+            editorsLoading
               ? "Loading editors…"
-              : editors.length === 0
-                ? "No editors for this author yet."
-                : "Pre-fills the publisher below."
-        }
-        value={selectedEditorId}
-        onChange={(e) => onEditorChange(e.currentTarget.value)}
-        disabled={!selected || editorsLoading || editors.length === 0}
-      >
-        <option value="">
-          {editors.length === 0 ? "—" : "Select an editor…"}
-        </option>
-        {editors.map((ed) => (
-          <option key={ed.id} value={ed.id}>
-            {ed.editorFirstName} {ed.editorLastName}
+              : "Pick a saved editor to pre-fill the publisher below."
+          }
+          value={selectedEditorId}
+          onChange={(e) => onEditorChange(e.currentTarget.value)}
+          disabled={editorsLoading}
+        >
+          <option value="">
+            {editorsLoading ? "Loading…" : "Select an editor…"}
           </option>
-        ))}
-      </SelectField>
+          {editors.map((ed) => (
+            <option key={ed.id} value={ed.id}>
+              {ed.editorFirstName} {ed.editorLastName}
+            </option>
+          ))}
+        </SelectField>
+      ) : (
+        <Field
+          label="Editor"
+          hint={
+            selected
+              ? "No saved editors for this author — type the editor's name."
+              : "Type the editor's name, or select an author to pick a saved editor."
+          }
+          autoComplete="off"
+          value={form.editorName}
+          onChange={(e) => update("editorName", e.currentTarget.value)}
+        />
+      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-5">
         <Field

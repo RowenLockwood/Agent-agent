@@ -21,7 +21,7 @@ type InputProps = BaseProps &
   Omit<InputHTMLAttributes<HTMLInputElement>, "size">;
 
 export const Field = forwardRef<HTMLInputElement, InputProps>(function Field(
-  { label, hint, required, highlightOnChange, className, value, ...rest },
+  { label, hint, required, highlightOnChange, className, value, onFocus, onBlur, onChange, ...rest },
   ref,
 ) {
   const id = useId();
@@ -48,17 +48,18 @@ export const Field = forwardRef<HTMLInputElement, InputProps>(function Field(
           id={id}
           ref={ref}
           value={value}
+          {...rest}
           onFocus={(e) => {
             setFocused(true);
-            rest.onFocus?.(e);
+            onFocus?.(e);
           }}
           onBlur={(e) => {
             setFocused(false);
-            rest.onBlur?.(e);
+            onBlur?.(e);
           }}
           onChange={(e) => {
             if (highlightOnChange) setPulseKey(String(e.currentTarget.value));
-            rest.onChange?.(e);
+            onChange?.(e);
           }}
           aria-required={required || undefined}
           className={
@@ -101,7 +102,7 @@ type SelectProps = BaseProps & SelectHTMLAttributes<HTMLSelectElement>;
 
 export const SelectField = forwardRef<HTMLSelectElement, SelectProps>(
   function SelectField(
-    { label, hint, required, children, className, ...rest },
+    { label, hint, required, children, className, onFocus, onBlur, ...rest },
     ref,
   ) {
     const id = useId();
@@ -125,13 +126,14 @@ export const SelectField = forwardRef<HTMLSelectElement, SelectProps>(
           <select
             id={id}
             ref={ref}
+            {...rest}
             onFocus={(e) => {
               setFocused(true);
-              rest.onFocus?.(e);
+              onFocus?.(e);
             }}
             onBlur={(e) => {
               setFocused(false);
-              rest.onBlur?.(e);
+              onBlur?.(e);
             }}
             className={
               "select-arrow w-full appearance-none bg-transparent border-0 border-b border-rule pl-0 pr-6 py-2 text-[1.05rem] text-ink focus:outline-none focus:ring-0 cursor-pointer " +
