@@ -1,5 +1,3 @@
-export const COMMISSION_RATE = 0.15;
-
 const USD = new Intl.NumberFormat("en-US", {
   style: "currency",
   currency: "USD",
@@ -12,34 +10,50 @@ export function formatUSD(value: number): string {
   return USD.format(value);
 }
 
+/** Format a commission rate (e.g. 15 → "15%", 12.5 → "12.5%"). */
+export function formatRate(rate: number): string {
+  const n = Number.isFinite(rate) ? rate : 15;
+  return `${parseFloat(n.toFixed(4))}%`;
+}
+
 export type EmailFields = {
   authorName: string;
   totalPayment: number;
+  commissionRate: number;
   commissionType: string;
   title: string;
   publisher: string;
   senderName: string;
 };
 
-export function calculateSplit(totalPayment: number) {
+export function calculateSplit(totalPayment: number, commissionRate = 15) {
   const total = Number.isFinite(totalPayment) ? Math.max(0, totalPayment) : 0;
-  const commission = total * COMMISSION_RATE;
+  const rate = Number.isFinite(commissionRate) && commissionRate > 0 ? commissionRate : 15;
+  const commission = total * (rate / 100);
   const author = total - commission;
   return { total, commission, author };
 }
 
 export function buildPaymentEmail(fields: EmailFields): string {
-  const { authorName, totalPayment, commissionType, title, publisher, senderName } =
-    fields;
-  const { author } = calculateSplit(totalPayment);
+  const {
+    authorName,
+    totalPayment,
+    commissionRate,
+    commissionType,
+    title,
+    publisher,
+    senderName,
+  } = fields;
+  const { author } = calculateSplit(totalPayment, commissionRate);
 
   const totalLabel = formatUSD(totalPayment);
   const authorLabel = formatUSD(author);
+  const rateLabel = formatRate(commissionRate);
 
   return [
     `Dear ${authorName || "[Author]"},`,
     "",
-    `We received our 15% commission on the ${totalLabel} ${commissionType} payment for ${title || "[Title]"} from ${publisher || "[Publisher]"}. You should receive payment directly from the publisher for ${authorLabel} within the week. Please confirm receipt. If it doesn't arrive within the week, let me know and we will follow up with the publisher.`,
+    `We received our ${rateLabel} commission on the ${totalLabel} ${commissionType} payment for ${title || "[Title]"} from ${publisher || "[Publisher]"}. You should receive payment directly from the publisher for ${authorLabel} within the week. Please confirm receipt. If it doesn't arrive within the week, let me know and we will follow up with the publisher.`,
     "",
     "All best,",
     "",

@@ -16,6 +16,7 @@ import {
   buildPaymentEmail,
   calculateSplit,
   COMMISSION_TYPES,
+  formatRate,
   formatUSD,
   type CommissionType,
 } from "@/lib/format";
@@ -32,6 +33,7 @@ type Props = {
 
 type FormState = {
   totalPayment: string;
+  commissionRate: string;
   commissionType: CommissionType;
   title: string;
   publisher: string;
@@ -40,6 +42,7 @@ type FormState = {
 
 const INITIAL: FormState = {
   totalPayment: "",
+  commissionRate: "15",
   commissionType: "advance",
   title: "",
   publisher: "",
@@ -118,9 +121,16 @@ export function PaymentEmailCard({
   }, [form.totalPayment]);
   const hasValidTotal = Number.isFinite(totalNumber) && totalNumber > 0;
 
+  const rateNumber = useMemo(() => {
+    if (!form.commissionRate) return 15;
+    const cleaned = form.commissionRate.replace(/[^0-9.]/g, "");
+    const n = Number.parseFloat(cleaned);
+    return Number.isFinite(n) && n > 0 && n <= 100 ? n : 15;
+  }, [form.commissionRate]);
+
   const split = useMemo(
-    () => calculateSplit(hasValidTotal ? totalNumber : 0),
-    [hasValidTotal, totalNumber],
+    () => calculateSplit(hasValidTotal ? totalNumber : 0, rateNumber),
+    [hasValidTotal, totalNumber, rateNumber],
   );
 
   function onGenerate() {
@@ -137,6 +147,7 @@ export function PaymentEmailCard({
       const body = buildPaymentEmail({
         authorName: `${selected.firstName} ${selected.lastName}`.trim(),
         totalPayment: totalNumber,
+        commissionRate: rateNumber,
         commissionType: form.commissionType,
         title: form.title,
         publisher: form.publisher,
@@ -197,7 +208,7 @@ export function PaymentEmailCard({
         </option>
         {editors.map((ed) => (
           <option key={ed.id} value={ed.id}>
-            {ed.editorFirstName} {ed.editorLastName} — {ed.publishingHouse}
+            {ed.editorFirstName} {ed.editorLastName}
           </option>
         ))}
       </SelectField>
@@ -210,6 +221,14 @@ export function PaymentEmailCard({
           placeholder="10000"
           value={form.totalPayment}
           onChange={(e) => update("totalPayment", e.currentTarget.value)}
+        />
+        <Field
+          label="Commission %"
+          inputMode="decimal"
+          autoComplete="off"
+          placeholder="15"
+          value={form.commissionRate}
+          onChange={(e) => update("commissionRate", e.currentTarget.value)}
         />
         <SelectField
           label="Commission type"
@@ -256,6 +275,7 @@ export function PaymentEmailCard({
         total={hasValidTotal ? totalNumber : null}
         commission={split.commission}
         author={split.author}
+        commissionRate={rateNumber}
       />
 
       <div className="pt-1 flex items-center justify-between gap-4">
@@ -308,10 +328,12 @@ function SplitPreview({
   total,
   commission,
   author,
+  commissionRate,
 }: {
   total: number | null;
   commission: number;
   author: number;
+  commissionRate: number;
 }) {
   return (
     <motion.div
@@ -321,7 +343,7 @@ function SplitPreview({
     >
       <Stat label="Total" value={total === null ? "—" : formatUSD(total)} />
       <Stat
-        label="Commission (15%)"
+        label={`Commission (${formatRate(commissionRate)})`}
         value={total === null ? "—" : formatUSD(commission)}
         tone="bronze"
       />
