@@ -126,7 +126,7 @@ export function AuthorPicker({
     <div className="relative pt-1" ref={rootRef}>
       <label
         htmlFor={id}
-        className="smallcaps block text-[0.68rem] text-ink-muted mb-1.5 transition-colors duration-300"
+        className="smallcaps block text-[0.78rem] text-ink-muted mb-1.5 transition-colors duration-300"
         style={{ color: labelActive ? "var(--color-wine)" : undefined }}
       >
         {label}
@@ -146,7 +146,7 @@ export function AuthorPicker({
         aria-controls={listboxId}
         onClick={() => setOpen((v) => !v)}
         onKeyDown={onKeyDown}
-        className="relative w-full text-left bg-transparent border-0 border-b border-rule pr-6 py-1.5 text-[0.95rem] cursor-pointer focus:outline-none"
+        className="relative w-full text-left bg-transparent border-0 border-b border-rule pr-6 py-2 text-[1.05rem] cursor-pointer focus:outline-none"
       >
         <AnimatePresence mode="wait" initial={false}>
           <motion.span
@@ -206,7 +206,7 @@ export function AuthorPicker({
             className="absolute z-20 mt-2 left-0 right-0 bg-paper-soft border border-rule shadow-[0_18px_40px_-22px_rgba(26,23,20,0.35)]"
           >
             {authors.length === 0 ? (
-              <p className="px-3 py-3 text-[0.85rem] italic text-ink-muted">
+              <p className="px-3 py-3 text-[0.95rem] italic text-ink-muted">
                 {emptyHint}
               </p>
             ) : (
@@ -224,7 +224,7 @@ export function AuthorPicker({
                         aria-selected={isSelected}
                         onMouseEnter={() => setActiveIndex(idx)}
                         onClick={() => choose(a)}
-                        className="relative w-full text-left px-3 py-2 text-[0.92rem] focus:outline-none transition-colors"
+                        className="relative w-full text-left px-3 py-2.5 text-[1.02rem] focus:outline-none transition-colors"
                         style={{
                           backgroundColor: isActive
                             ? "rgba(107,26,37,0.06)"
@@ -235,7 +235,7 @@ export function AuthorPicker({
                         <span className="flex items-baseline justify-between gap-3">
                           <span className="truncate">{a.name}</span>
                           {a.title && (
-                            <span className="font-serif italic text-[0.85rem] text-ink-muted truncate">
+                            <span className="font-serif italic text-[0.95rem] text-ink-muted truncate">
                               {a.title}
                             </span>
                           )}

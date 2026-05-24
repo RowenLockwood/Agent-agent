@@ -62,7 +62,7 @@ function Masthead() {
           Plato
         </h1>
 
-        <p className="mt-2 font-serif italic text-[1.05rem] sm:text-[1.2rem] text-ink-soft">
+        <p className="mt-3 font-serif italic text-[1.2rem] sm:text-[1.35rem] text-ink-soft">
           An Agent for Literary Agents
         </p>
       </div>
@@ -83,7 +83,7 @@ function Colophon() {
               "linear-gradient(to right, transparent, var(--color-rule))",
           }}
         />
-        <span className="smallcaps text-[0.66rem] tracking-[0.22em]">
+        <span className="smallcaps text-[0.74rem] tracking-[0.22em]">
           Composed in good company
         </span>
         <PlatoMark className="w-3 h-3" />

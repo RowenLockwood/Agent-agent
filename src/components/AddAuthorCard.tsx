@@ -131,7 +131,7 @@ export function AddAuthorCard({ onSaved }: Props) {
       </div>
 
       <div className="pt-1 flex items-center justify-between gap-4">
-        <div className="min-h-[1.25rem] text-[0.82rem] leading-tight">
+        <div className="min-h-[1.25rem] text-[0.92rem] leading-tight">
           <AnimatePresence mode="wait">
             {error && (
               <motion.span
@@ -152,7 +152,7 @@ export function AddAuthorCard({ onSaved }: Props) {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -2 }}
                 transition={{ duration: 0.28 }}
-                className="text-forest italic font-serif text-[0.95rem]"
+                className="text-forest italic font-serif text-[1.05rem]"
               >
                 {success}
               </motion.span>
@@ -164,7 +164,7 @@ export function AddAuthorCard({ onSaved }: Props) {
           type="submit"
           disabled={pending}
           whileTap={{ scale: 0.985 }}
-          className="group relative inline-flex items-center gap-2 px-5 py-2 text-[0.78rem] smallcaps text-paper bg-ink hover:bg-forest transition-colors disabled:opacity-60"
+          className="group relative inline-flex items-center gap-2 px-5 py-2.5 text-[0.85rem] smallcaps text-paper bg-ink hover:bg-forest transition-colors disabled:opacity-60"
         >
           <span>{pending ? "Saving" : "Save author"}</span>
           <span aria-hidden="true" className="inline-block">

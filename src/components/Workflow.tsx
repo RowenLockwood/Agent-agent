@@ -71,7 +71,7 @@ export function Workflow({ initialAuthors, initialError }: Props) {
         aria-labelledby="card-one-heading"
         className="lg:pr-12 xl:pr-16"
       >
-        <CardHeader id="card-one-heading" numeral="I" title="Add new author" />
+        <CardHeader id="card-one-heading" title="Add new author" />
         <AddAuthorCard onSaved={handleSaved} />
       </motion.section>
 
@@ -94,7 +94,7 @@ export function Workflow({ initialAuthors, initialError }: Props) {
         aria-labelledby="card-two-heading"
         className="lg:pl-12 xl:pl-16"
       >
-        <CardHeader id="card-two-heading" numeral="II" title="Payment email" />
+        <CardHeader id="card-two-heading" title="Payment email" />
         <PaymentEmailCard
           authors={authors}
           selectedId={selectedId}
@@ -107,38 +107,24 @@ export function Workflow({ initialAuthors, initialError }: Props) {
   );
 }
 
-function CardHeader({
-  id,
-  numeral,
-  title,
-}: {
-  id: string;
-  numeral: string;
-  title: string;
-}) {
+function CardHeader({ id, title }: { id: string; title: string }) {
   return (
-    <header className="mb-7 flex items-baseline gap-4">
-      <span
-        className="font-serif italic text-[1.6rem] leading-none"
-        style={{ color: "var(--color-bronze-deep)" }}
-        aria-hidden="true"
-      >
-        {numeral}
-      </span>
-      <span
-        aria-hidden="true"
-        className="block h-px flex-1"
-        style={{
-          background:
-            "linear-gradient(to right, var(--color-rule), transparent 75%)",
-        }}
-      />
+    <header className="mb-8 flex items-baseline gap-5">
       <h2
         id={id}
-        className="smallcaps text-[0.78rem] text-ink-muted whitespace-nowrap"
+        className="font-serif text-[2rem] sm:text-[2.25rem] leading-none tracking-[-0.005em] whitespace-nowrap"
+        style={{ color: "var(--color-ink)" }}
       >
         {title}
       </h2>
+      <span
+        aria-hidden="true"
+        className="block h-px flex-1 translate-y-[-0.35rem]"
+        style={{
+          background:
+            "linear-gradient(to right, var(--color-rule), transparent 85%)",
+        }}
+      />
     </header>
   );
 }
