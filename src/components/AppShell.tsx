@@ -39,6 +39,14 @@ export function AppShell({ initialAuthors, initialError }: Props) {
     setAuthorsError(null);
   }
 
+  function handleAuthorUpdated(author: AuthorRecord) {
+    setAuthors((prev) => prev.map((a) => (a.id === author.id ? author : a)));
+  }
+
+  function handleAuthorDeleted(id: string) {
+    setAuthors((prev) => prev.filter((a) => a.id !== id));
+  }
+
   const TAB_NAMES: Record<Tab, string> = { 0: "Client Library", 1: "Payment Email" };
 
   return (
@@ -95,9 +103,11 @@ export function AppShell({ initialAuthors, initialError }: Props) {
                 className="h-full"
               >
                 <ClientLibrary
-                  initialAuthors={authors}
+                  authors={authors}
                   authorsError={authorsError}
-                  onAuthorAdded={handleAuthorAdded}
+                  onAdded={handleAuthorAdded}
+                  onUpdated={handleAuthorUpdated}
+                  onDeleted={handleAuthorDeleted}
                 />
               </motion.div>
             ) : (

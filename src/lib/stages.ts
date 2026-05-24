@@ -142,6 +142,15 @@ export const EDITOR_STAGE_OPTIONS: Record<EditorStageField, StageOption[]> = {
   ],
 };
 
+export function editorStageValueLabel(
+  field: EditorStageField,
+  value: string,
+): string {
+  return (
+    EDITOR_STAGE_OPTIONS[field].find((o) => o.value === value)?.label ?? value
+  );
+}
+
 // ─── Editor stage color logic ─────────────────────────────────────────────────
 
 type EditorStageColor = "blue" | "amber" | "green" | "red" | "gray";
@@ -240,6 +249,10 @@ export type EditorStages = {
   paymentSentToAuthorStage: string;
 };
 
+// A stage is locked when its immediate predecessor is itself locked OR the
+// predecessor has not reached its unlock value. Checking the predecessor's
+// locked state (not just its value) makes locking cascade: relocking an
+// earlier stage automatically relocks every stage that depends on it.
 export function editorStageLocked(
   field: EditorStageField,
   stages: EditorStages,
@@ -248,15 +261,30 @@ export function editorStageLocked(
     case "proposalStage":
       return false;
     case "authorMeetingStage":
-      return stages.proposalStage !== "accepted";
+      return (
+        editorStageLocked("proposalStage", stages) ||
+        stages.proposalStage !== "accepted"
+      );
     case "bidStage":
-      return stages.authorMeetingStage !== "one_to_one_complete";
+      return (
+        editorStageLocked("authorMeetingStage", stages) ||
+        stages.authorMeetingStage !== "one_to_one_complete"
+      );
     case "dealMemoStage":
-      return stages.bidStage !== "bid_received";
+      return (
+        editorStageLocked("bidStage", stages) ||
+        stages.bidStage !== "bid_received"
+      );
     case "paymentReceivedStage":
-      return stages.dealMemoStage !== "accepted";
+      return (
+        editorStageLocked("dealMemoStage", stages) ||
+        stages.dealMemoStage !== "accepted"
+      );
     case "paymentSentToAuthorStage":
-      return stages.paymentReceivedStage !== "received";
+      return (
+        editorStageLocked("paymentReceivedStage", stages) ||
+        stages.paymentReceivedStage !== "received"
+      );
   }
 }
 

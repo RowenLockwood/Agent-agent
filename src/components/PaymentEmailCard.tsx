@@ -9,11 +9,14 @@ import {
   useState,
   useTransition,
 } from "react";
+import { listEditorOutreachAction } from "@/app/actions";
 import type { AuthorRecord } from "@/lib/authors";
+import type { EditorOutreachRecord } from "@/lib/editorOutreach";
 import {
   buildPaymentEmail,
   calculateSplit,
   COMMISSION_TYPES,
+  formatRate,
   formatUSD,
   type CommissionType,
 } from "@/lib/format";
@@ -30,7 +33,9 @@ type Props = {
 
 type FormState = {
   totalPayment: string;
+  commissionRate: string;
   commissionType: CommissionType;
+  editorName: string;
   title: string;
   publisher: string;
   senderName: string;
@@ -38,7 +43,9 @@ type FormState = {
 
 const INITIAL: FormState = {
   totalPayment: "",
+  commissionRate: "15",
   commissionType: "advance",
+  editorName: "",
   title: "",
   publisher: "",
   senderName: "",
@@ -61,27 +68,54 @@ export function PaymentEmailCard({
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
-  const lastAuthorRef = useRef<string | null>(null);
   const emailRef = useRef<HTMLTextAreaElement>(null);
 
-  // Auto-fill when author selection changes. Pulls title/publisher/senderName
-  // from the author record. Always overrides on selection change — the user
-  // can still edit afterward.
+  const [editors, setEditors] = useState<EditorOutreachRecord[]>([]);
+  const [editorsLoading, setEditorsLoading] = useState(false);
+  const [selectedEditorId, setSelectedEditorId] = useState<string>("");
+
+  // When the author changes: auto-fill title + sender, and load that author's
+  // editors so the publisher can be pre-filled from a chosen editor.
   useEffect(() => {
-    if (!selected) {
-      lastAuthorRef.current = null;
-      return;
-    }
-    if (lastAuthorRef.current === selected.id) return;
-    lastAuthorRef.current = selected.id;
-    // title/publisher are no longer stored on Author (they are local form fields now).
-    // Only senderName auto-fills from headAgent.
+    setEmail(null);
+    setSelectedEditorId("");
+    setEditors([]);
+    if (!selected) return;
+
     setForm((f) => ({
       ...f,
-      senderName: selected.headAgent ?? "",
+      editorName: "",
+      title: selected.title,
+      publisher: "",
+      senderName: selected.headAgent,
+    }));
+
+    let cancelled = false;
+    setEditorsLoading(true);
+    (async () => {
+      const r = await listEditorOutreachAction(selected.id);
+      if (cancelled) return;
+      setEditorsLoading(false);
+      if (r.ok) setEditors(r.editors);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [selected]);
+
+  function onEditorChange(id: string) {
+    setSelectedEditorId(id);
+    const editor = editors.find((e) => e.id === id);
+    setForm((f) => ({
+      ...f,
+      editorName: editor
+        ? `${editor.editorFirstName} ${editor.editorLastName}`.trim()
+        : "",
+      publisher: editor ? editor.publishingHouse : "",
     }));
     setEmail(null);
-  }, [selected]);
+    if (error) setError(null);
+  }
 
   function update<K extends keyof FormState>(key: K, val: FormState[K]) {
     setForm((f) => ({ ...f, [key]: val }));
@@ -96,9 +130,16 @@ export function PaymentEmailCard({
   }, [form.totalPayment]);
   const hasValidTotal = Number.isFinite(totalNumber) && totalNumber > 0;
 
+  const rateNumber = useMemo(() => {
+    if (!form.commissionRate) return 15;
+    const cleaned = form.commissionRate.replace(/[^0-9.]/g, "");
+    const n = Number.parseFloat(cleaned);
+    return Number.isFinite(n) && n > 0 && n <= 100 ? n : 15;
+  }, [form.commissionRate]);
+
   const split = useMemo(
-    () => calculateSplit(hasValidTotal ? totalNumber : 0),
-    [hasValidTotal, totalNumber],
+    () => calculateSplit(hasValidTotal ? totalNumber : 0, rateNumber),
+    [hasValidTotal, totalNumber, rateNumber],
   );
 
   function onGenerate() {
@@ -115,6 +156,7 @@ export function PaymentEmailCard({
       const body = buildPaymentEmail({
         authorName: `${selected.firstName} ${selected.lastName}`.trim(),
         totalPayment: totalNumber,
+        commissionRate: rateNumber,
         commissionType: form.commissionType,
         title: form.title,
         publisher: form.publisher,
@@ -155,6 +197,41 @@ export function PaymentEmailCard({
         required
       />
 
+      {selected && (editorsLoading || editors.length > 0) ? (
+        <SelectField
+          label="Editor"
+          hint={
+            editorsLoading
+              ? "Loading editors…"
+              : "Pick a saved editor to pre-fill the publisher below."
+          }
+          value={selectedEditorId}
+          onChange={(e) => onEditorChange(e.currentTarget.value)}
+          disabled={editorsLoading}
+        >
+          <option value="">
+            {editorsLoading ? "Loading…" : "Select an editor…"}
+          </option>
+          {editors.map((ed) => (
+            <option key={ed.id} value={ed.id}>
+              {ed.editorFirstName} {ed.editorLastName}
+            </option>
+          ))}
+        </SelectField>
+      ) : (
+        <Field
+          label="Editor"
+          hint={
+            selected
+              ? "No saved editors for this author — type the editor's name."
+              : "Type the editor's name, or select an author to pick a saved editor."
+          }
+          autoComplete="off"
+          value={form.editorName}
+          onChange={(e) => update("editorName", e.currentTarget.value)}
+        />
+      )}
+
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-5">
         <Field
           label="Total payment"
@@ -163,6 +240,14 @@ export function PaymentEmailCard({
           placeholder="10000"
           value={form.totalPayment}
           onChange={(e) => update("totalPayment", e.currentTarget.value)}
+        />
+        <Field
+          label="Commission %"
+          inputMode="decimal"
+          autoComplete="off"
+          placeholder="15"
+          value={form.commissionRate}
+          onChange={(e) => update("commissionRate", e.currentTarget.value)}
         />
         <SelectField
           label="Commission type"
@@ -178,7 +263,8 @@ export function PaymentEmailCard({
           ))}
         </SelectField>
         <Field
-          label="Title"
+          label="Book title"
+          hint="Auto-fills from the author."
           autoComplete="off"
           highlightOnChange
           value={form.title}
@@ -186,6 +272,7 @@ export function PaymentEmailCard({
         />
         <Field
           label="Publisher"
+          hint="Auto-fills from the selected editor."
           autoComplete="off"
           highlightOnChange
           value={form.publisher}
@@ -207,6 +294,7 @@ export function PaymentEmailCard({
         total={hasValidTotal ? totalNumber : null}
         commission={split.commission}
         author={split.author}
+        commissionRate={rateNumber}
       />
 
       <div className="pt-1 flex items-center justify-between gap-4">
@@ -259,10 +347,12 @@ function SplitPreview({
   total,
   commission,
   author,
+  commissionRate,
 }: {
   total: number | null;
   commission: number;
   author: number;
+  commissionRate: number;
 }) {
   return (
     <motion.div
@@ -272,7 +362,7 @@ function SplitPreview({
     >
       <Stat label="Total" value={total === null ? "—" : formatUSD(total)} />
       <Stat
-        label="Commission (15%)"
+        label={`Commission (${formatRate(commissionRate)})`}
         value={total === null ? "—" : formatUSD(commission)}
         tone="bronze"
       />

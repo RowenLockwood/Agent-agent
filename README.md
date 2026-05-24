@@ -20,23 +20,24 @@ An internal tool for literary agents. V1 includes a **Client Library CRM** and a
 
 A polished CRM for tracking authors and their publishing pipelines.
 
-- **Add Author** — modal form capturing first/last name, email, head agent, head agent email, assigned assistant.
-- **Author pipeline** — seven-stage diamond timeline (Book Proposal → Payment Sent to Author). Each diamond is clickable; status updates immediately in the database via optimistic UI. Stages: Not Started / In Progress / Completed.
-- **Editor outreach** — expand any author row to reveal a table of editors reached out to. Add editors inline. Each editor has a six-stage pipeline (Book Proposal → Payment Sent to Author) with stage-specific status options and unlock logic (later stages are locked until prior stages advance).
-- **Upload Editor List** — file selection UI present; import parsing is not yet enabled (placeholder for a future import feature).
+- **Add Author** — centered modal capturing first/last name, book title, genre, author email, head agent, head agent email, and assigned assistant. All fields are required. The modal also hosts the **Upload Editor List** control (per-author; import parsing is stubbed for a future release).
+- **Edit / Delete Author** — every author row has Edit (reopens the modal pre-filled) and Delete (guarded by a confirmation dialog; cascade-deletes that author's editors).
+- **Author stages** — a row of seven labeled squares (Book Proposal Sent → Payment Sent to Author). Each square shows the stage name plus its current status; click to change it. Updates immediately via optimistic UI. Statuses: Not Started / In Progress / Completed.
+- **Editor outreach** — expand any author row to reveal that author's editors as cards. Add, edit, and delete editors (delete is confirmation-guarded). Each editor has six labeled stage squares (Book Proposal → Payment Sent to Author) with stage-specific options and sequential unlock logic (later stages stay locked until the prior stage advances).
 
 ### Payment Email
 
 - Select an author from the Client Library roster.
-- Enter total payment, commission type, title, publisher, and sender name.
-- Sender name auto-fills from the author's head agent.
+- Select one of that author's editors — the publisher field pre-fills from the editor's publishing house.
+- Book title auto-fills from the author; sender name auto-fills from the author's head agent.
+- Enter total payment and commission type.
 - Calculates 15% commission split live.
 - "Generate Email" produces a copy-pasteable payment confirmation email.
 - No real email is sent; this tab generates text only.
 
 ## Known Limitations
 
-- **File upload parsing**: The "Upload Editor List" control accepts a file but does not parse or import it. This is intentional — the feature is stubbed for a future release.
+- **File upload parsing**: The "Upload Editor List" control (in the Add Author modal) accepts a file but does not parse or import it. This is intentional — the feature is stubbed for a future release.
 - **Email sending**: "Generate Email" produces copy-pasteable text only. No email is actually sent.
 - **No authentication**: Treat all deployments as internal-only until auth is added.
 
@@ -44,14 +45,15 @@ A polished CRM for tracking authors and their publishing pipelines.
 
 ```
 Author
-  id, firstName, lastName, email?, headAgent?, headAgentEmail?, assignedAssistant?
+  id, firstName, lastName, title, genre, email, headAgent, headAgentEmail,
+  assignedAssistant  (all required)
   proposalSentToEditors, authorMeetings, bidSent, dealMemoSent, dealMemoAccepted,
   paymentReceived, paymentSentToAuthor  (all String, default "not_started")
   createdAt, updatedAt
 
 EditorOutreach
   id, authorId → Author (cascade delete)
-  editorFirstName, editorLastName, editorEmail?, publishingHouse?
+  editorFirstName, editorLastName, editorEmail, publishingHouse  (all required)
   proposalStage, authorMeetingStage, bidStage, dealMemoStage,
   paymentReceivedStage, paymentSentToAuthorStage
   createdAt, updatedAt
@@ -102,6 +104,8 @@ Open [http://localhost:3000](http://localhost:3000).
 
 **V1 → V2 schema change** (migration `20260524000001_client_library`): The original `Author` model (`name`, `title`, `editor`, `publisher`) was replaced with a new model (`firstName`, `lastName`, `headAgentEmail`, `assignedAssistant`, plus pipeline stage fields) and a new `EditorOutreach` model. Since the database was confirmed empty at the time of this change, the migration drops and recreates the `Author` table rather than performing a data-preserving ALTER.
 
+**Required fields + Title/Genre** (migration `20260524000002_required_title_genre`): Adds required `title` and `genre` to `Author`, and makes the remaining `Author` text fields (`email`, `headAgent`, `headAgentEmail`, `assignedAssistant`) and `EditorOutreach` (`editorEmail`, `publishingHouse`) `NOT NULL`. Existing `NULL`s are backfilled to empty strings before the constraints apply, so the migration is safe on a populated database.
+
 ## Scripts
 
 | Script | What it does |
@@ -124,26 +128,28 @@ prisma/
   migrations/
     20260524000000_init/       Initial schema
     20260524000001_client_library/  Author model rebuild + EditorOutreach
+    20260524000002_required_title_genre/  Title/Genre + required fields
 
 src/
   app/
-    actions.ts               Server actions (create/list/update authors + editors)
+    actions.ts               Server actions (CRUD authors + editors, stage updates)
     layout.tsx               Fonts + global shell
-    globals.css              Editorial theme tokens + stage diamond utilities
+    globals.css              Editorial theme tokens + utilities
     page.tsx                 Root: initial data fetch → AppShell
 
   components/
     AppShell.tsx             Client shell: tab state, sidebar state, shared authors
     SidebarNav.tsx           Desktop sidebar + mobile hamburger drawer
 
-    ClientLibrary.tsx        CRM tab: author list, header, upload control
-    AddAuthorModal.tsx       Modal for adding a new author
-    AuthorTableRow.tsx       Collapsible author row with stage timeline + editors
-    AuthorStageTimeline.tsx  7-diamond author pipeline
-    EditorOutreachTable.tsx  Lazy-loaded editor rows per author
-    AddEditorRow.tsx         Inline add-editor form
-    EditorStageTimeline.tsx  6-diamond editor pipeline with unlock logic
+    ClientLibrary.tsx        CRM tab: author list + header (controlled by AppShell)
+    AddAuthorModal.tsx       Centered modal for adding/editing an author + upload
+    AuthorTableRow.tsx       Author row: stages, edit/delete, editor drawer
+    AuthorStageTimeline.tsx  7-square author stages
+    EditorOutreachTable.tsx  Lazy-loaded editor cards per author (add/edit/delete)
+    EditorForm.tsx           Shared add/edit editor form
+    EditorStageTimeline.tsx  6-square editor stages with unlock logic
     StagePopover.tsx         Portal-based popover for stage selection
+    ConfirmDialog.tsx        Reusable delete-confirmation dialog
     FileUploadControl.tsx    Disabled upload control (placeholder)
 
     PaymentEmailCard.tsx     Payment email generator

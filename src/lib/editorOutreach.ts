@@ -6,8 +6,8 @@ export type EditorOutreachRecord = {
   authorId: string;
   editorFirstName: string;
   editorLastName: string;
-  editorEmail: string | null;
-  publishingHouse: string | null;
+  editorEmail: string;
+  publishingHouse: string;
   proposalStage: string;
   authorMeetingStage: string;
   bidStage: string;
@@ -18,21 +18,20 @@ export type EditorOutreachRecord = {
   updatedAt: string;
 };
 
-export type CreateEditorOutreachInput = {
-  authorId: string;
+export type EditorDetails = {
   editorFirstName: string;
   editorLastName: string;
-  editorEmail?: string | null;
-  publishingHouse?: string | null;
+  editorEmail: string;
+  publishingHouse: string;
 };
 
-function serialize(r: {
+type EditorRow = {
   id: string;
   authorId: string;
   editorFirstName: string;
   editorLastName: string;
-  editorEmail: string | null;
-  publishingHouse: string | null;
+  editorEmail: string;
+  publishingHouse: string;
   proposalStage: string;
   authorMeetingStage: string;
   bidStage: string;
@@ -41,7 +40,9 @@ function serialize(r: {
   paymentSentToAuthorStage: string;
   createdAt: Date;
   updatedAt: Date;
-}): EditorOutreachRecord {
+};
+
+function serialize(r: EditorRow): EditorOutreachRecord {
   return { ...r, createdAt: r.createdAt.toISOString(), updatedAt: r.updatedAt.toISOString() };
 }
 
@@ -56,18 +57,25 @@ export async function listEditorOutreach(
 }
 
 export async function createEditorOutreach(
-  input: CreateEditorOutreachInput,
+  authorId: string,
+  input: EditorDetails,
 ): Promise<EditorOutreachRecord> {
   const row = await prisma.editorOutreach.create({
-    data: {
-      authorId: input.authorId,
-      editorFirstName: input.editorFirstName,
-      editorLastName: input.editorLastName,
-      editorEmail: input.editorEmail || null,
-      publishingHouse: input.publishingHouse || null,
-    },
+    data: { authorId, ...input },
   });
   return serialize(row);
+}
+
+export async function updateEditorOutreach(
+  id: string,
+  input: EditorDetails,
+): Promise<EditorOutreachRecord> {
+  const row = await prisma.editorOutreach.update({ where: { id }, data: input });
+  return serialize(row);
+}
+
+export async function deleteEditorOutreach(id: string): Promise<void> {
+  await prisma.editorOutreach.delete({ where: { id } });
 }
 
 export async function updateEditorStage(

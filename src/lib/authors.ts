@@ -5,10 +5,12 @@ export type AuthorRecord = {
   id: string;
   firstName: string;
   lastName: string;
-  email: string | null;
-  headAgent: string | null;
-  headAgentEmail: string | null;
-  assignedAssistant: string | null;
+  title: string;
+  genre: string;
+  email: string;
+  headAgent: string;
+  headAgentEmail: string;
+  assignedAssistant: string;
   proposalSentToEditors: string;
   authorMeetings: string;
   bidSent: string;
@@ -20,23 +22,27 @@ export type AuthorRecord = {
   updatedAt: string;
 };
 
-export type CreateAuthorInput = {
+export type AuthorDetails = {
   firstName: string;
   lastName: string;
-  email?: string | null;
-  headAgent?: string | null;
-  headAgentEmail?: string | null;
-  assignedAssistant?: string | null;
+  title: string;
+  genre: string;
+  email: string;
+  headAgent: string;
+  headAgentEmail: string;
+  assignedAssistant: string;
 };
 
-function serialize(a: {
+type AuthorRow = {
   id: string;
   firstName: string;
   lastName: string;
-  email: string | null;
-  headAgent: string | null;
-  headAgentEmail: string | null;
-  assignedAssistant: string | null;
+  title: string;
+  genre: string;
+  email: string;
+  headAgent: string;
+  headAgentEmail: string;
+  assignedAssistant: string;
   proposalSentToEditors: string;
   authorMeetings: string;
   bidSent: string;
@@ -46,7 +52,9 @@ function serialize(a: {
   paymentSentToAuthor: string;
   createdAt: Date;
   updatedAt: Date;
-}): AuthorRecord {
+};
+
+function serialize(a: AuthorRow): AuthorRecord {
   return { ...a, createdAt: a.createdAt.toISOString(), updatedAt: a.updatedAt.toISOString() };
 }
 
@@ -55,18 +63,21 @@ export async function listAuthors(): Promise<AuthorRecord[]> {
   return rows.map(serialize);
 }
 
-export async function createAuthor(input: CreateAuthorInput): Promise<AuthorRecord> {
-  const row = await prisma.author.create({
-    data: {
-      firstName: input.firstName,
-      lastName: input.lastName,
-      email: input.email || null,
-      headAgent: input.headAgent || null,
-      headAgentEmail: input.headAgentEmail || null,
-      assignedAssistant: input.assignedAssistant || null,
-    },
-  });
+export async function createAuthor(input: AuthorDetails): Promise<AuthorRecord> {
+  const row = await prisma.author.create({ data: input });
   return serialize(row);
+}
+
+export async function updateAuthor(
+  id: string,
+  input: AuthorDetails,
+): Promise<AuthorRecord> {
+  const row = await prisma.author.update({ where: { id }, data: input });
+  return serialize(row);
+}
+
+export async function deleteAuthor(id: string): Promise<void> {
+  await prisma.author.delete({ where: { id } });
 }
 
 export async function updateAuthorStage(

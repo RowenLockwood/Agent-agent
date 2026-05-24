@@ -2,16 +2,22 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import { useState, useTransition } from "react";
-import { listEditorOutreachAction, updateAuthorStageAction } from "@/app/actions";
+import {
+  deleteAuthorAction,
+  listEditorOutreachAction,
+  updateAuthorStageAction,
+} from "@/app/actions";
 import type { AuthorRecord } from "@/lib/authors";
 import type { EditorOutreachRecord } from "@/lib/editorOutreach";
 import type { AuthorStageField } from "@/lib/stages";
-import { AUTHOR_STAGE_FIELDS } from "@/lib/stages";
 import { AuthorStageTimeline } from "./AuthorStageTimeline";
+import { ConfirmDialog } from "./ConfirmDialog";
 import { EditorOutreachTable } from "./EditorOutreachTable";
 
 type Props = {
   author: AuthorRecord;
+  onEdit: (author: AuthorRecord) => void;
+  onDeleted: (id: string) => void;
 };
 
 type AuthorStages = Record<AuthorStageField, string>;
@@ -28,11 +34,13 @@ function stagesFromAuthor(a: AuthorRecord): AuthorStages {
   };
 }
 
-export function AuthorTableRow({ author }: Props) {
+export function AuthorTableRow({ author, onEdit, onDeleted }: Props) {
   const [stages, setStages] = useState<AuthorStages>(stagesFromAuthor(author));
   const [expanded, setExpanded] = useState(false);
   const [editors, setEditors] = useState<EditorOutreachRecord[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [deleting, startDelete] = useTransition();
   const [, startTransition] = useTransition();
 
   function handleExpand() {
@@ -56,14 +64,26 @@ export function AuthorTableRow({ author }: Props) {
     });
   }
 
+  function handleDelete() {
+    startDelete(async () => {
+      const r = await deleteAuthorAction(author.id);
+      if (r.ok) {
+        setConfirmOpen(false);
+        onDeleted(author.id);
+      }
+    });
+  }
+
   function handleEditorAdded(editor: EditorOutreachRecord) {
     setEditors((prev) => (prev ? [...prev, editor] : [editor]));
   }
-
   function handleEditorUpdated(updated: EditorOutreachRecord) {
     setEditors((prev) =>
       prev ? prev.map((e) => (e.id === updated.id ? updated : e)) : prev,
     );
+  }
+  function handleEditorDeleted(id: string) {
+    setEditors((prev) => (prev ? prev.filter((e) => e.id !== id) : prev));
   }
 
   const editorCount = editors?.length ?? null;
@@ -74,10 +94,9 @@ export function AuthorTableRow({ author }: Props) {
       className="border-b"
       style={{ borderColor: "var(--color-rule-soft)" }}
     >
-      {/* Author info row */}
       <div className="px-4 sm:px-6 py-5">
-        <div className="flex flex-wrap items-start gap-y-3 gap-x-6">
-          {/* Name + metadata */}
+        {/* Header: identity + actions */}
+        <div className="flex flex-wrap items-start justify-between gap-y-3 gap-x-6">
           <div className="flex-1 min-w-0">
             <h3
               className="font-serif text-[1.35rem] leading-tight"
@@ -89,46 +108,65 @@ export function AuthorTableRow({ author }: Props) {
               className="mt-1.5 flex flex-wrap gap-x-4 gap-y-0.5 text-[0.8rem] font-sans"
               style={{ color: "var(--color-ink-muted)" }}
             >
-              {author.email && <span>{author.email}</span>}
-              {author.headAgent && (
-                <span>
-                  Agent:{" "}
-                  <span style={{ color: "var(--color-ink-soft)" }}>
-                    {author.headAgent}
-                  </span>
-                  {author.headAgentEmail && (
-                    <span className="ml-1 opacity-70">({author.headAgentEmail})</span>
-                  )}
+              <span>
+                <span className="italic">{author.title}</span>
+                <span className="mx-1.5 opacity-50">·</span>
+                {author.genre}
+              </span>
+              <span>{author.email}</span>
+              <span>
+                Agent:{" "}
+                <span style={{ color: "var(--color-ink-soft)" }}>
+                  {author.headAgent}
                 </span>
-              )}
-              {author.assignedAssistant && (
-                <span>
-                  Assistant:{" "}
-                  <span style={{ color: "var(--color-ink-soft)" }}>
-                    {author.assignedAssistant}
-                  </span>
+                <span className="ml-1 opacity-70">({author.headAgentEmail})</span>
+              </span>
+              <span>
+                Assistant:{" "}
+                <span style={{ color: "var(--color-ink-soft)" }}>
+                  {author.assignedAssistant}
                 </span>
-              )}
+              </span>
             </div>
           </div>
 
-          {/* Stage timeline */}
-          <div className="flex flex-col gap-1.5 flex-shrink-0">
-            <div
-              className="smallcaps text-[0.65rem] mb-1"
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <button
+              type="button"
+              onClick={() => onEdit(author)}
+              className="text-[0.76rem] smallcaps transition-colors hover:text-ink"
               style={{ color: "var(--color-ink-muted)" }}
             >
-              Pipeline
-            </div>
-            <AuthorStageTimeline
-              authorId={author.id}
-              stages={stages}
-              onUpdate={handleStageUpdate}
-            />
+              Edit
+            </button>
+            <span style={{ color: "var(--color-rule)" }}>·</span>
+            <button
+              type="button"
+              onClick={() => setConfirmOpen(true)}
+              className="text-[0.76rem] smallcaps transition-colors hover:text-wine"
+              style={{ color: "var(--color-ink-muted)" }}
+            >
+              Delete
+            </button>
           </div>
         </div>
 
-        {/* Expand / collapse button */}
+        {/* Stages */}
+        <div className="mt-4">
+          <div
+            className="smallcaps text-[0.65rem] mb-2"
+            style={{ color: "var(--color-ink-muted)" }}
+          >
+            Stages
+          </div>
+          <AuthorStageTimeline
+            authorId={author.id}
+            stages={stages}
+            onUpdate={handleStageUpdate}
+          />
+        </div>
+
+        {/* Expand / collapse editors */}
         <div className="mt-4 flex items-center gap-2">
           <button
             type="button"
@@ -181,11 +219,21 @@ export function AuthorTableRow({ author }: Props) {
                 editors={editors}
                 onEditorAdded={handleEditorAdded}
                 onEditorUpdated={handleEditorUpdated}
+                onEditorDeleted={handleEditorDeleted}
               />
             )}
           </motion.div>
         )}
       </AnimatePresence>
+
+      <ConfirmDialog
+        open={confirmOpen}
+        title="Delete author?"
+        message={`Permanently remove ${author.firstName} ${author.lastName}, their stages, and every editor reached out to for them. This cannot be undone.`}
+        pending={deleting}
+        onConfirm={handleDelete}
+        onCancel={() => setConfirmOpen(false)}
+      />
     </motion.div>
   );
 }

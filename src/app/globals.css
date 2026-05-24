@@ -67,27 +67,6 @@
     background-position: right 0.15rem center;
     background-size: 0.85rem;
   }
-  /* Diamond shape used in stage timelines */
-  .stage-diamond {
-    width: 12px;
-    height: 12px;
-    transform: rotate(45deg);
-    display: inline-block;
-    flex-shrink: 0;
-    border-width: 1.5px;
-    border-style: solid;
-    transition: box-shadow 200ms ease, border-color 200ms ease, background-color 200ms ease;
-  }
-  .stage-diamond-sm {
-    width: 10px;
-    height: 10px;
-    transform: rotate(45deg);
-    display: inline-block;
-    flex-shrink: 0;
-    border-width: 1.5px;
-    border-style: solid;
-    transition: box-shadow 200ms ease, border-color 200ms ease, background-color 200ms ease;
-  }
 }
 
 input, textarea, select {

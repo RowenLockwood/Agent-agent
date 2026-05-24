@@ -5,25 +5,37 @@ import { useState } from "react";
 import type { AuthorRecord } from "@/lib/authors";
 import { AddAuthorModal } from "./AddAuthorModal";
 import { AuthorTableRow } from "./AuthorTableRow";
-import { FileUploadControl } from "./FileUploadControl";
 
 type Props = {
-  initialAuthors: AuthorRecord[];
+  authors: AuthorRecord[];
   authorsError: string | null;
-  onAuthorAdded: (a: AuthorRecord) => void;
+  onAdded: (a: AuthorRecord) => void;
+  onUpdated: (a: AuthorRecord) => void;
+  onDeleted: (id: string) => void;
 };
 
-export function ClientLibrary({ initialAuthors, authorsError, onAuthorAdded }: Props) {
-  const [authors, setAuthors] = useState<AuthorRecord[]>(initialAuthors);
+export function ClientLibrary({
+  authors,
+  authorsError,
+  onAdded,
+  onUpdated,
+  onDeleted,
+}: Props) {
   const [modalOpen, setModalOpen] = useState(false);
+  const [editTarget, setEditTarget] = useState<AuthorRecord | null>(null);
 
-  function handleSaved(author: AuthorRecord) {
-    setAuthors((prev) => [author, ...prev.filter((a) => a.id !== author.id)]);
-    onAuthorAdded(author);
+  function openAdd() {
+    setEditTarget(null);
+    setModalOpen(true);
   }
-
-  // Keep in sync if parent adds authors (e.g. Payment Email is also adding — not in v1, but defensive)
-  const merged = authors.length >= initialAuthors.length ? authors : initialAuthors;
+  function openEdit(author: AuthorRecord) {
+    setEditTarget(author);
+    setModalOpen(true);
+  }
+  function handleSaved(author: AuthorRecord) {
+    if (editTarget) onUpdated(author);
+    else onAdded(author);
+  }
 
   return (
     <div className="flex flex-col h-full min-h-0 overflow-auto">
@@ -49,76 +61,53 @@ export function ClientLibrary({ initialAuthors, authorsError, onAuthorAdded }: P
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-4 mt-1">
-            <FileUploadControl />
-            <motion.button
-              type="button"
-              onClick={() => setModalOpen(true)}
-              whileTap={{ scale: 0.985 }}
-              className="inline-flex items-center gap-2 px-5 py-2.5 text-[0.85rem] smallcaps text-paper bg-wine hover:bg-wine-deep transition-colors"
-            >
-              + Add Author
-            </motion.button>
-          </div>
+          <motion.button
+            type="button"
+            onClick={openAdd}
+            whileTap={{ scale: 0.985 }}
+            className="inline-flex items-center gap-2 px-5 py-2.5 text-[0.85rem] smallcaps text-paper bg-wine hover:bg-wine-deep transition-colors mt-1"
+          >
+            + Add Author
+          </motion.button>
         </div>
       </div>
 
       {/* Author list */}
       <div className="flex-1 min-h-0">
-        {authorsError && merged.length === 0 ? (
+        {authorsError && authors.length === 0 ? (
           <div
             className="px-6 sm:px-10 lg:px-14 py-10 text-[0.9rem] font-sans"
             style={{ color: "var(--color-wine)" }}
           >
             {authorsError}
           </div>
-        ) : merged.length === 0 ? (
-          <EmptyState onAddClick={() => setModalOpen(true)} />
+        ) : authors.length === 0 ? (
+          <EmptyState onAddClick={openAdd} />
         ) : (
-          <div>
-            {/* Column headers */}
-            <div
-              className="hidden sm:flex px-6 sm:px-10 lg:px-14 py-2.5 border-b"
-              style={{ borderColor: "var(--color-rule-soft)" }}
-            >
-              <div className="flex-1">
-                <span
-                  className="smallcaps text-[0.67rem]"
-                  style={{ color: "var(--color-ink-muted)" }}
-                >
-                  Author
-                </span>
-              </div>
-              <div className="flex-shrink-0 pr-2">
-                <span
-                  className="smallcaps text-[0.67rem]"
-                  style={{ color: "var(--color-ink-muted)" }}
-                >
-                  Pipeline
-                </span>
-              </div>
-            </div>
-
-            <AnimatePresence initial={false}>
-              {merged.map((author) => (
-                <motion.div
-                  key={author.id}
-                  initial={{ opacity: 0, y: -8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.28 }}
-                  className="px-6 sm:px-10 lg:px-14"
-                >
-                  <AuthorTableRow author={author} />
-                </motion.div>
-              ))}
-            </AnimatePresence>
-          </div>
+          <AnimatePresence initial={false}>
+            {authors.map((author) => (
+              <motion.div
+                key={author.id}
+                initial={{ opacity: 0, y: -8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.28 }}
+                className="px-6 sm:px-10 lg:px-14"
+              >
+                <AuthorTableRow
+                  author={author}
+                  onEdit={openEdit}
+                  onDeleted={onDeleted}
+                />
+              </motion.div>
+            ))}
+          </AnimatePresence>
         )}
       </div>
 
       <AddAuthorModal
         open={modalOpen}
+        author={editTarget}
         onClose={() => setModalOpen(false)}
         onSaved={handleSaved}
       />
