@@ -1,14 +1,18 @@
+import type { CSSProperties } from "react";
+
 type Props = {
   className?: string;
+  style?: CSSProperties;
 };
 
 // A small editorial fleuron / ornament used to mark sections and dividers.
 // Hand-tuned SVG (not a stock icon) — three intersecting wedges with a center disk.
-export function PlatoMark({ className }: Props) {
+export function PlatoMark({ className, style }: Props) {
   return (
     <svg
       viewBox="0 0 32 32"
       className={className}
+      style={style}
       aria-hidden="true"
       focusable="false"
     >

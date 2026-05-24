@@ -160,7 +160,9 @@ export function AuthorPicker({
               color: selected ? "var(--color-ink)" : "var(--color-ink-muted)",
             }}
           >
-            {selected ? selected.name : "Select an author…"}
+            {selected
+              ? `${selected.firstName} ${selected.lastName}`.trim()
+              : "Select an author…"}
           </motion.span>
         </AnimatePresence>
         <motion.span
@@ -233,10 +235,12 @@ export function AuthorPicker({
                         }}
                       >
                         <span className="flex items-baseline justify-between gap-3">
-                          <span className="truncate">{a.name}</span>
-                          {a.title && (
+                          <span className="truncate">
+                            {a.firstName} {a.lastName}
+                          </span>
+                          {a.headAgent && (
                             <span className="font-serif italic text-[0.95rem] text-ink-muted truncate">
-                              {a.title}
+                              {a.headAgent}
                             </span>
                           )}
                         </span>

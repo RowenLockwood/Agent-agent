@@ -74,10 +74,10 @@ export function PaymentEmailCard({
     }
     if (lastAuthorRef.current === selected.id) return;
     lastAuthorRef.current = selected.id;
+    // title/publisher are no longer stored on Author (they are local form fields now).
+    // Only senderName auto-fills from headAgent.
     setForm((f) => ({
       ...f,
-      title: selected.title ?? "",
-      publisher: selected.publisher ?? "",
       senderName: selected.headAgent ?? "",
     }));
     setEmail(null);
@@ -113,7 +113,7 @@ export function PaymentEmailCard({
     }
     startTransition(() => {
       const body = buildPaymentEmail({
-        authorName: selected.name,
+        authorName: `${selected.firstName} ${selected.lastName}`.trim(),
         totalPayment: totalNumber,
         commissionType: form.commissionType,
         title: form.title,

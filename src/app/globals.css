@@ -16,6 +16,13 @@
   --color-bronze-deep: #6c5224;
   --color-forest: #0f2a1f;
   --color-forest-soft: #1a3d2d;
+
+  --color-sidebar: #1a1714;
+  --color-sidebar-hover: #2a2420;
+  --color-sidebar-active: #2e2825;
+  --color-sidebar-rule: rgba(207,196,168,0.15);
+  --color-sidebar-text: #c8bfa8;
+  --color-sidebar-muted: #7a7060;
 }
 
 @theme inline {
@@ -26,32 +33,24 @@
 @layer base {
   :root {
     color-scheme: light;
+    --sidebar-w: 220px;
   }
 
   html {
-    background-color: var(--color-paper);
+    background-color: var(--color-sidebar);
   }
 
   body {
-    /* Subtle paper texture — fractal noise + warm vignette layered onto cream */
     background-color: var(--color-paper);
     background-image:
-      radial-gradient(
-        ellipse at 20% 0%,
-        rgba(138, 106, 50, 0.08),
-        transparent 55%
-      ),
-      radial-gradient(
-        ellipse at 100% 100%,
-        rgba(15, 42, 31, 0.06),
-        transparent 50%
-      ),
+      radial-gradient(ellipse at 20% 0%, rgba(138,106,50,0.06), transparent 55%),
+      radial-gradient(ellipse at 100% 100%, rgba(15,42,31,0.05), transparent 50%),
       url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.08 0 0 0 0 0.06 0 0 0 0 0.04 0 0 0 0.07 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
     background-blend-mode: multiply, multiply, multiply;
   }
 
   ::selection {
-    background-color: rgba(107, 26, 37, 0.18);
+    background-color: rgba(107,26,37,0.18);
     color: var(--color-ink);
   }
 }
@@ -62,19 +61,36 @@
     letter-spacing: 0.18em;
     text-transform: lowercase;
   }
-  /* Custom select arrow for native selects styled to match */
   .select-arrow {
     background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'><path fill='none' stroke='%231a1714' stroke-width='1.2' d='M2.5 4.5L6 8l3.5-3.5'/></svg>");
     background-repeat: no-repeat;
     background-position: right 0.15rem center;
     background-size: 0.85rem;
   }
+  /* Diamond shape used in stage timelines */
+  .stage-diamond {
+    width: 12px;
+    height: 12px;
+    transform: rotate(45deg);
+    display: inline-block;
+    flex-shrink: 0;
+    border-width: 1.5px;
+    border-style: solid;
+    transition: box-shadow 200ms ease, border-color 200ms ease, background-color 200ms ease;
+  }
+  .stage-diamond-sm {
+    width: 10px;
+    height: 10px;
+    transform: rotate(45deg);
+    display: inline-block;
+    flex-shrink: 0;
+    border-width: 1.5px;
+    border-style: solid;
+    transition: box-shadow 200ms ease, border-color 200ms ease, background-color 200ms ease;
+  }
 }
 
-/* Caret + form niceties */
-input,
-textarea,
-select {
+input, textarea, select {
   caret-color: var(--color-wine);
 }
 
