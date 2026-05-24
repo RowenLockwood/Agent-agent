@@ -142,6 +142,15 @@ export const EDITOR_STAGE_OPTIONS: Record<EditorStageField, StageOption[]> = {
   ],
 };
 
+export function editorStageValueLabel(
+  field: EditorStageField,
+  value: string,
+): string {
+  return (
+    EDITOR_STAGE_OPTIONS[field].find((o) => o.value === value)?.label ?? value
+  );
+}
+
 // ─── Editor stage color logic ─────────────────────────────────────────────────
 
 type EditorStageColor = "blue" | "amber" | "green" | "red" | "gray";

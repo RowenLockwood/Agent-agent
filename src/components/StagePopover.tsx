@@ -13,7 +13,7 @@ import { createPortal } from "react-dom";
 type Option = { value: string; label: string };
 
 type Props = {
-  /** The trigger element (the diamond button). */
+  /** The trigger element (the stage square). */
   trigger: ReactNode;
   options: Option[];
   currentValue: string;
@@ -21,9 +21,11 @@ type Props = {
   /** If locked, the trigger shows gray and no popover opens. */
   locked?: boolean;
   lockReason?: string;
-  /** Tooltip text for the stage name (shown on hover even when locked). */
+  /** Accessible name for the stage. */
   stageLabel: string;
   disabled?: boolean;
+  /** Extra classes for the trigger button (e.g. to make it fill its cell). */
+  triggerClassName?: string;
 };
 
 export function StagePopover({
@@ -35,12 +37,13 @@ export function StagePopover({
   lockReason,
   stageLabel,
   disabled,
+  triggerClassName,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [tooltip, setTooltip] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
-  const [pos, setPos] = useState({ top: 0, left: 0 });
+  const [pos, setPos] = useState({ top: 0, left: 0, below: false });
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => { setMounted(true); }, []);
@@ -48,9 +51,12 @@ export function StagePopover({
   const calcPos = useCallback(() => {
     if (!triggerRef.current) return;
     const r = triggerRef.current.getBoundingClientRect();
+    // Flip below the trigger when there isn't enough room above.
+    const below = r.top < 240;
     setPos({
-      top: r.top - 8, // will be adjusted with translate
+      top: below ? r.bottom + 8 : r.top - 8,
       left: r.left + r.width / 2,
+      below,
     });
   }, []);
 
@@ -93,17 +99,17 @@ export function StagePopover({
           key="popover"
           role="listbox"
           aria-label={`${stageLabel} options`}
-          initial={{ opacity: 0, y: 4, scale: 0.97 }}
+          initial={{ opacity: 0, y: pos.below ? -4 : 4, scale: 0.97 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, y: 4, scale: 0.97 }}
+          exit={{ opacity: 0, y: pos.below ? -4 : 4, scale: 0.97 }}
           transition={{ duration: 0.18, ease: [0.2, 0.6, 0.2, 1] }}
           style={{
             position: "fixed",
             top: pos.top,
             left: pos.left,
-            transform: "translate(-50%, -100%)",
+            transform: `translate(-50%, ${pos.below ? "0" : "-100%"})`,
             zIndex: 9999,
-            minWidth: 150,
+            minWidth: 168,
           }}
           className="bg-paper border border-rule shadow-[0_12px_32px_-12px_rgba(26,23,20,0.45)] py-1"
         >
@@ -146,8 +152,8 @@ export function StagePopover({
     document.body,
   ) : null;
 
-  // Tooltip for stage label (and lock reason)
-  const tooltipContent = mounted ? createPortal(
+  // Tooltip — only shown for locked stages, to explain why.
+  const tooltipContent = mounted && locked && lockReason ? createPortal(
     <AnimatePresence>
       {tooltip && !open && (
         <motion.div
@@ -170,8 +176,7 @@ export function StagePopover({
           } as React.CSSProperties}
           className="px-2.5 py-1 text-[0.72rem] font-sans rounded-sm"
         >
-          {locked && lockReason ? lockReason : stageLabel}
-          {/* small arrow */}
+          {lockReason}
           <span
             className="absolute left-1/2 -translate-x-1/2 bottom-[-4px] w-0 h-0"
             style={{
@@ -200,7 +205,10 @@ export function StagePopover({
         aria-expanded={open}
         aria-label={`${stageLabel}: ${options.find((o) => o.value === currentValue)?.label ?? currentValue}`}
         disabled={disabled}
-        className="focus:outline-none focus-visible:ring-1 focus-visible:ring-bronze rounded-sm"
+        className={
+          "focus:outline-none focus-visible:ring-1 focus-visible:ring-bronze rounded-sm " +
+          (triggerClassName ?? "")
+        }
         style={{ cursor: locked || disabled ? "default" : "pointer" }}
       >
         {trigger}

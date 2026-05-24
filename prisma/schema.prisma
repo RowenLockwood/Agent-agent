@@ -13,10 +13,12 @@ model Author {
   id                    String   @id @default(cuid())
   firstName             String
   lastName              String
-  email                 String?
-  headAgent             String?
-  headAgentEmail        String?
-  assignedAssistant     String?
+  title                 String
+  genre                 String
+  email                 String
+  headAgent             String
+  headAgentEmail        String
+  assignedAssistant     String
 
   // Author-level publishing pipeline stages
   // Values: "not_started" | "in_progress" | "completed"
@@ -43,8 +45,8 @@ model EditorOutreach {
 
   editorFirstName  String
   editorLastName   String
-  editorEmail      String?
-  publishingHouse  String?
+  editorEmail      String
+  publishingHouse  String
 
   // Editor-level stage values — each stage has its own allowed set (see src/lib/stages.ts)
   proposalStage            String @default("not_sent")

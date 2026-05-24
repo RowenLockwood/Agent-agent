@@ -9,7 +9,9 @@ import {
   useState,
   useTransition,
 } from "react";
+import { listEditorOutreachAction } from "@/app/actions";
 import type { AuthorRecord } from "@/lib/authors";
+import type { EditorOutreachRecord } from "@/lib/editorOutreach";
 import {
   buildPaymentEmail,
   calculateSplit,
@@ -61,27 +63,47 @@ export function PaymentEmailCard({
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
-  const lastAuthorRef = useRef<string | null>(null);
   const emailRef = useRef<HTMLTextAreaElement>(null);
 
-  // Auto-fill when author selection changes. Pulls title/publisher/senderName
-  // from the author record. Always overrides on selection change — the user
-  // can still edit afterward.
+  const [editors, setEditors] = useState<EditorOutreachRecord[]>([]);
+  const [editorsLoading, setEditorsLoading] = useState(false);
+  const [selectedEditorId, setSelectedEditorId] = useState<string>("");
+
+  // When the author changes: auto-fill title + sender, and load that author's
+  // editors so the publisher can be pre-filled from a chosen editor.
   useEffect(() => {
-    if (!selected) {
-      lastAuthorRef.current = null;
-      return;
-    }
-    if (lastAuthorRef.current === selected.id) return;
-    lastAuthorRef.current = selected.id;
-    // title/publisher are no longer stored on Author (they are local form fields now).
-    // Only senderName auto-fills from headAgent.
+    setEmail(null);
+    setSelectedEditorId("");
+    setEditors([]);
+    if (!selected) return;
+
     setForm((f) => ({
       ...f,
-      senderName: selected.headAgent ?? "",
+      title: selected.title,
+      publisher: "",
+      senderName: selected.headAgent,
     }));
-    setEmail(null);
+
+    let cancelled = false;
+    setEditorsLoading(true);
+    (async () => {
+      const r = await listEditorOutreachAction(selected.id);
+      if (cancelled) return;
+      setEditorsLoading(false);
+      if (r.ok) setEditors(r.editors);
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [selected]);
+
+  function onEditorChange(id: string) {
+    setSelectedEditorId(id);
+    const editor = editors.find((e) => e.id === id);
+    setForm((f) => ({ ...f, publisher: editor ? editor.publishingHouse : "" }));
+    setEmail(null);
+    if (error) setError(null);
+  }
 
   function update<K extends keyof FormState>(key: K, val: FormState[K]) {
     setForm((f) => ({ ...f, [key]: val }));
@@ -155,6 +177,31 @@ export function PaymentEmailCard({
         required
       />
 
+      <SelectField
+        label="Editor"
+        hint={
+          !selected
+            ? "Select an author first."
+            : editorsLoading
+              ? "Loading editors…"
+              : editors.length === 0
+                ? "No editors for this author yet."
+                : "Pre-fills the publisher below."
+        }
+        value={selectedEditorId}
+        onChange={(e) => onEditorChange(e.currentTarget.value)}
+        disabled={!selected || editorsLoading || editors.length === 0}
+      >
+        <option value="">
+          {editors.length === 0 ? "—" : "Select an editor…"}
+        </option>
+        {editors.map((ed) => (
+          <option key={ed.id} value={ed.id}>
+            {ed.editorFirstName} {ed.editorLastName} — {ed.publishingHouse}
+          </option>
+        ))}
+      </SelectField>
+
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-5">
         <Field
           label="Total payment"
@@ -178,7 +225,8 @@ export function PaymentEmailCard({
           ))}
         </SelectField>
         <Field
-          label="Title"
+          label="Book title"
+          hint="Auto-fills from the author."
           autoComplete="off"
           highlightOnChange
           value={form.title}
@@ -186,6 +234,7 @@ export function PaymentEmailCard({
         />
         <Field
           label="Publisher"
+          hint="Auto-fills from the selected editor."
           autoComplete="off"
           highlightOnChange
           value={form.publisher}

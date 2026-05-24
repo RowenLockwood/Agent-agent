@@ -3,36 +3,33 @@
 import { z } from "zod";
 import {
   createAuthor,
+  deleteAuthor,
   listAuthors,
+  updateAuthor,
   updateAuthorStage,
   type AuthorRecord,
 } from "@/lib/authors";
 import {
   createEditorOutreach,
+  deleteEditorOutreach,
   listEditorOutreach,
+  updateEditorOutreach,
   updateEditorStage,
   type EditorOutreachRecord,
 } from "@/lib/editorOutreach";
 import type { AuthorStageField, EditorStageField } from "@/lib/stages";
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-const trim = z
-  .string()
-  .trim()
-  .transform((v) => (v.length === 0 ? null : v))
-  .nullable()
-  .optional();
-
 // ─── Authors ──────────────────────────────────────────────────────────────────
 
-const createAuthorSchema = z.object({
+const authorSchema = z.object({
   firstName: z.string().trim().min(1, "First name is required."),
   lastName: z.string().trim().min(1, "Last name is required."),
-  email: trim,
-  headAgent: trim,
-  headAgentEmail: trim,
-  assignedAssistant: trim,
+  title: z.string().trim().min(1, "Book title is required."),
+  genre: z.string().trim().min(1, "Genre is required."),
+  email: z.string().trim().min(1, "Author email is required."),
+  headAgent: z.string().trim().min(1, "Head agent is required."),
+  headAgentEmail: z.string().trim().min(1, "Head agent email is required."),
+  assignedAssistant: z.string().trim().min(1, "Assigned assistant is required."),
 });
 
 export type CreateAuthorResult =
@@ -40,7 +37,7 @@ export type CreateAuthorResult =
   | { ok: false; error: string };
 
 export async function createAuthorAction(raw: unknown): Promise<CreateAuthorResult> {
-  const parsed = createAuthorSchema.safeParse(raw);
+  const parsed = authorSchema.safeParse(raw);
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid input." };
   }
@@ -50,6 +47,35 @@ export async function createAuthorAction(raw: unknown): Promise<CreateAuthorResu
   } catch (err) {
     console.error("createAuthorAction", err);
     return { ok: false, error: "Could not save author. Check the database connection." };
+  }
+}
+
+export async function updateAuthorAction(
+  id: string,
+  raw: unknown,
+): Promise<CreateAuthorResult> {
+  const parsed = authorSchema.safeParse(raw);
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid input." };
+  }
+  try {
+    const author = await updateAuthor(id, parsed.data);
+    return { ok: true, author };
+  } catch (err) {
+    console.error("updateAuthorAction", err);
+    return { ok: false, error: "Could not update author." };
+  }
+}
+
+export type DeleteResult = { ok: true } | { ok: false; error: string };
+
+export async function deleteAuthorAction(id: string): Promise<DeleteResult> {
+  try {
+    await deleteAuthor(id);
+    return { ok: true };
+  } catch (err) {
+    console.error("deleteAuthorAction", err);
+    return { ok: false, error: "Could not delete author." };
   }
 }
 
@@ -84,29 +110,59 @@ export async function updateAuthorStageAction(
 
 // ─── Editor Outreach ──────────────────────────────────────────────────────────
 
-const createEditorSchema = z.object({
-  authorId: z.string().min(1),
+const editorSchema = z.object({
   editorFirstName: z.string().trim().min(1, "Editor first name is required."),
   editorLastName: z.string().trim().min(1, "Editor last name is required."),
-  editorEmail: trim,
-  publishingHouse: trim,
+  editorEmail: z.string().trim().min(1, "Editor email is required."),
+  publishingHouse: z.string().trim().min(1, "Publishing house is required."),
 });
 
 export type CreateEditorResult =
   | { ok: true; editor: EditorOutreachRecord }
   | { ok: false; error: string };
 
-export async function createEditorAction(raw: unknown): Promise<CreateEditorResult> {
-  const parsed = createEditorSchema.safeParse(raw);
+export async function createEditorAction(
+  authorId: string,
+  raw: unknown,
+): Promise<CreateEditorResult> {
+  if (!authorId) return { ok: false, error: "Missing author." };
+  const parsed = editorSchema.safeParse(raw);
   if (!parsed.success) {
     return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid input." };
   }
   try {
-    const editor = await createEditorOutreach(parsed.data);
+    const editor = await createEditorOutreach(authorId, parsed.data);
     return { ok: true, editor };
   } catch (err) {
     console.error("createEditorAction", err);
     return { ok: false, error: "Could not save editor." };
+  }
+}
+
+export async function updateEditorAction(
+  id: string,
+  raw: unknown,
+): Promise<CreateEditorResult> {
+  const parsed = editorSchema.safeParse(raw);
+  if (!parsed.success) {
+    return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid input." };
+  }
+  try {
+    const editor = await updateEditorOutreach(id, parsed.data);
+    return { ok: true, editor };
+  } catch (err) {
+    console.error("updateEditorAction", err);
+    return { ok: false, error: "Could not update editor." };
+  }
+}
+
+export async function deleteEditorAction(id: string): Promise<DeleteResult> {
+  try {
+    await deleteEditorOutreach(id);
+    return { ok: true };
+  } catch (err) {
+    console.error("deleteEditorAction", err);
+    return { ok: false, error: "Could not delete editor." };
   }
 }
 
