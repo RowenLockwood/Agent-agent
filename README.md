@@ -35,6 +35,22 @@ A polished CRM for tracking authors and their publishing pipelines.
 - "Generate Email" produces a copy-pasteable payment confirmation email.
 - No real email is sent; this tab generates text only.
 
+#### Editing a generated email (OpenAI)
+
+Once an email has been generated, a **Revise with Plato** panel appears beneath it.
+Type an instruction — _"Make this warmer," "Make it more formal," "Shorten this,"
+"Mention the publisher is sometimes slow"_ — and press **Edit email** to have the
+generated email rewritten in place.
+
+- Powered by the **OpenAI API** (Responses API, reasoning effort `high`).
+- The request runs entirely server-side via `POST /api/payment-email/refine`; the
+  API key is read from `OPENAI_API_KEY` on the server and **never** reaches the browser.
+- The model is `OPENAI_MODEL` (default `gpt-5.5`). Change it if that model isn't
+  available on your account — no code change required.
+- The model is instructed to preserve the factual payment details and to return the
+  email text only. Revisions stay client-side; the generated email box remains fully
+  editable and copyable. **This feature edits email text only — it never sends email.**
+
 ## Known Limitations
 
 - **File upload parsing**: The "Upload Editor List" control (in the Add Author modal) accepts a file but does not parse or import it. This is intentional — the feature is stubbed for a future release.
@@ -78,7 +94,13 @@ Create a free Postgres database at [console.neon.tech](https://console.neon.tech
 ```bash
 cp .env.example .env
 # paste your Neon URL as DATABASE_URL
+# (optional) add OPENAI_API_KEY to enable the Payment Email "Edit Email" feature;
+# set OPENAI_MODEL to override the default model (gpt-5.5)
 ```
+
+`OPENAI_API_KEY` is only required for the Payment Email revision feature; the rest of
+the app runs without it. Keep it server-side — add it in Vercel → Settings →
+Environment Variables for deployments, never in client code.
 
 ### 4. Apply the schema
 
@@ -133,6 +155,9 @@ prisma/
 src/
   app/
     actions.ts               Server actions (CRUD authors + editors, stage updates)
+    api/
+      payment-email/
+        refine/route.ts      POST: revise a generated payment email via OpenAI
     layout.tsx               Fonts + global shell
     globals.css              Editorial theme tokens + utilities
     page.tsx                 Root: initial data fetch → AppShell
@@ -163,4 +188,6 @@ src/
     editorOutreach.ts        EditorOutreach Prisma queries
     db.ts                    Lazy Prisma client (Neon HTTP adapter)
     format.ts                USD formatting + payment email template
+    openai/
+      refinePaymentEmail.ts  Server-side OpenAI Responses call for email revision
 ```
