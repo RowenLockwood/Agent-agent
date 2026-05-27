@@ -51,6 +51,8 @@ const INITIAL: FormState = {
   senderName: "",
 };
 
+const MAX_INSTRUCTION = 1000;
+
 export function PaymentEmailCard({
   authors,
   selectedId,
@@ -69,6 +71,22 @@ export function PaymentEmailCard({
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const emailRef = useRef<HTMLTextAreaElement>(null);
+
+  // Plato revision panel (LLM "Edit Email").
+  const [revisionInstruction, setRevisionInstruction] = useState("");
+  const [isRefining, setIsRefining] = useState(false);
+  const [refineError, setRefineError] = useState<string | null>(null);
+  const [refineSuccess, setRefineSuccess] = useState(false);
+
+  // Whenever the composed email is cleared (form edits, author switch), reset
+  // the revision panel so it never lingers without an email to act on.
+  useEffect(() => {
+    if (email === null) {
+      setRevisionInstruction("");
+      setRefineError(null);
+      setRefineSuccess(false);
+    }
+  }, [email]);
 
   const [editors, setEditors] = useState<EditorOutreachRecord[]>([]);
   const [editorsLoading, setEditorsLoading] = useState(false);
@@ -181,6 +199,72 @@ export function PaymentEmailCard({
     } catch (err) {
       console.error(err);
       setError("Could not copy. Select the text and copy it manually.");
+    }
+  }
+
+  function onInstructionChange(value: string) {
+    setRevisionInstruction(value.slice(0, MAX_INSTRUCTION));
+    if (refineError) setRefineError(null);
+    if (refineSuccess) setRefineSuccess(false);
+  }
+
+  async function onRefine() {
+    if (!email) return;
+    const instruction = revisionInstruction.trim();
+    if (!instruction) {
+      setRefineError("Tell Plato how you'd like to revise the email.");
+      return;
+    }
+    setRefineError(null);
+    setRefineSuccess(false);
+    setIsRefining(true);
+    try {
+      const res = await fetch("/api/payment-email/refine", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          initialEmail: email,
+          userInstruction: instruction,
+          authorName: selected
+            ? `${selected.firstName} ${selected.lastName}`.trim()
+            : undefined,
+          title: form.title || undefined,
+          publisher: form.publisher || undefined,
+          editorName: form.editorName || undefined,
+          totalPayment: hasValidTotal ? formatUSD(totalNumber) : undefined,
+          authorPayment: hasValidTotal ? formatUSD(split.author) : undefined,
+          commissionType: form.commissionType,
+        }),
+      });
+      const data: unknown = await res.json().catch(() => null);
+      const revised =
+        data && typeof data === "object" && "revisedEmail" in data
+          ? (data as { revisedEmail?: unknown }).revisedEmail
+          : undefined;
+      if (!res.ok || typeof revised !== "string" || !revised.trim()) {
+        const message =
+          data && typeof data === "object" && "error" in data
+            ? (data as { error?: unknown }).error
+            : undefined;
+        setRefineError(
+          typeof message === "string"
+            ? message
+            : "Plato couldn't revise the email. Please try again.",
+        );
+        return;
+      }
+      setEmail(revised.trim());
+      setRevisionInstruction("");
+      setCopied(false);
+      setRefineSuccess(true);
+      setTimeout(() => setRefineSuccess(false), 2600);
+    } catch (err) {
+      console.error(err);
+      setRefineError(
+        "Plato couldn't reach the editor. Check your connection and try again.",
+      );
+    } finally {
+      setIsRefining(false);
     }
   }
 
@@ -338,7 +422,27 @@ export function PaymentEmailCard({
         </motion.button>
       </div>
 
-      <EmailReveal email={email} onCopy={onCopy} copied={copied} ref={emailRef} />
+      <EmailReveal
+        email={email}
+        onCopy={onCopy}
+        copied={copied}
+        revised={refineSuccess}
+        onChange={(v) => {
+          setEmail(v);
+          setCopied(false);
+        }}
+        ref={emailRef}
+      />
+
+      <RefinePanel
+        visible={!!email}
+        value={revisionInstruction}
+        onChange={onInstructionChange}
+        onSubmit={onRefine}
+        isRefining={isRefining}
+        error={refineError}
+        success={refineSuccess}
+      />
     </div>
   );
 }
@@ -414,10 +518,12 @@ type EmailRevealProps = {
   email: string | null;
   onCopy: () => void;
   copied: boolean;
+  revised: boolean;
+  onChange: (value: string) => void;
 };
 
 const EmailReveal = forwardRef<HTMLTextAreaElement, EmailRevealProps>(
-  function EmailReveal({ email, onCopy, copied }, ref) {
+  function EmailReveal({ email, onCopy, copied, revised, onChange }, ref) {
     return (
       <AnimatePresence>
         {email && (
@@ -440,6 +546,31 @@ const EmailReveal = forwardRef<HTMLTextAreaElement, EmailRevealProps>(
                 <h3 className="smallcaps text-[0.82rem] text-ink-muted">
                   Composed email
                 </h3>
+                <AnimatePresence>
+                  {revised && (
+                    <motion.span
+                      key="revised-pill"
+                      initial={{ opacity: 0, x: -4 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: -4 }}
+                      transition={{ duration: 0.3, ease: [0.2, 0.6, 0.2, 1] }}
+                      className="inline-flex items-center gap-1 smallcaps text-[0.72rem]"
+                      style={{ color: "var(--color-forest)" }}
+                    >
+                      <svg width="10" height="10" viewBox="0 0 12 12">
+                        <path
+                          d="M2 6.5 L5 9 L10 3.5"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="1.6"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                      Revised by Plato
+                    </motion.span>
+                  )}
+                </AnimatePresence>
               </div>
               <motion.button
                 type="button"
@@ -483,17 +614,33 @@ const EmailReveal = forwardRef<HTMLTextAreaElement, EmailRevealProps>(
                 </AnimatePresence>
               </motion.button>
             </div>
-            <motion.textarea
-              ref={ref}
-              readOnly
-              value={email}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.08, duration: 0.4 }}
-              rows={Math.max(9, email.split("\n").length + 1)}
-              className="w-full bg-paper-soft border border-rule-soft px-5 py-5 font-serif text-[1.12rem] leading-[1.7] text-ink resize-none focus:outline-none focus:border-ink/60 transition-colors whitespace-pre-wrap"
-              spellCheck={false}
-            />
+            <div className="relative">
+              <motion.textarea
+                ref={ref}
+                value={email}
+                onChange={(e) => onChange(e.currentTarget.value)}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.08, duration: 0.4 }}
+                rows={Math.max(9, email.split("\n").length + 1)}
+                className="w-full bg-paper-soft border border-rule-soft px-5 py-5 font-serif text-[1.12rem] leading-[1.7] text-ink resize-none focus:outline-none focus:border-ink/60 transition-colors whitespace-pre-wrap"
+                spellCheck={false}
+              />
+              <AnimatePresence>
+                {revised && (
+                  <motion.span
+                    key="revise-pulse"
+                    aria-hidden="true"
+                    initial={{ opacity: 0.5 }}
+                    animate={{ opacity: 0 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 1.4, ease: "easeOut" }}
+                    className="pointer-events-none absolute inset-0"
+                    style={{ background: "rgba(15,42,31,0.10)" }}
+                  />
+                )}
+              </AnimatePresence>
+            </div>
             <div className="mt-2 text-[0.8rem] italic text-ink-muted">
               The text is yours to edit before pasting into your email client.
             </div>
@@ -503,3 +650,174 @@ const EmailReveal = forwardRef<HTMLTextAreaElement, EmailRevealProps>(
     );
   },
 );
+
+type RefinePanelProps = {
+  visible: boolean;
+  value: string;
+  onChange: (value: string) => void;
+  onSubmit: () => void;
+  isRefining: boolean;
+  error: string | null;
+  success: boolean;
+};
+
+function RefinePanel({
+  visible,
+  value,
+  onChange,
+  onSubmit,
+  isRefining,
+  error,
+  success,
+}: RefinePanelProps) {
+  const canSubmit = value.trim().length > 0 && !isRefining;
+
+  return (
+    <AnimatePresence>
+      {visible && (
+        <motion.section
+          key="refine-panel"
+          initial={{ opacity: 0, y: -6 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -4 }}
+          transition={{ duration: 0.42, ease: [0.2, 0.6, 0.2, 1], delay: 0.05 }}
+          style={{ transformOrigin: "top" }}
+          className="mt-5 border border-rule-soft bg-paper-soft px-5 py-5"
+        >
+          <div className="flex items-center gap-3 mb-2.5">
+            <span
+              aria-hidden="true"
+              className="inline-block w-1.5 h-1.5 rounded-full"
+              style={{ background: "var(--color-bronze)" }}
+            />
+            <h3 className="smallcaps text-[0.82rem] text-ink-muted">
+              Revise with Plato
+            </h3>
+          </div>
+          <p className="font-serif italic text-[1.02rem] leading-snug text-ink-soft mb-3.5">
+            Looking for something different? Tell me here and I&rsquo;ll edit the
+            email.
+          </p>
+
+          <div className="relative">
+            <textarea
+              value={value}
+              onChange={(e) => onChange(e.currentTarget.value)}
+              onKeyDown={(e) => {
+                if ((e.metaKey || e.ctrlKey) && e.key === "Enter" && canSubmit) {
+                  e.preventDefault();
+                  onSubmit();
+                }
+              }}
+              disabled={isRefining}
+              maxLength={MAX_INSTRUCTION}
+              rows={3}
+              placeholder={
+                "Try: “Make this warmer,” “Make it more formal,” “Shorten this,” or “Mention the publisher is sometimes slow.”"
+              }
+              className="w-full bg-paper border border-rule-soft px-4 py-3 font-serif text-[1.02rem] leading-[1.6] text-ink placeholder:text-ink-muted/55 resize-none focus:outline-none focus:border-ink/60 transition-colors disabled:opacity-60"
+              spellCheck
+            />
+            <AnimatePresence>
+              {value.length > 0 && (
+                <motion.span
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="pointer-events-none absolute bottom-2 right-3 text-[0.7rem] tabular-nums text-ink-muted/70"
+                >
+                  {value.length}/{MAX_INSTRUCTION}
+                </motion.span>
+              )}
+            </AnimatePresence>
+          </div>
+
+          <div className="mt-3.5 flex items-center justify-between gap-4">
+            <div className="min-h-[1.25rem] text-[0.9rem] leading-tight">
+              <AnimatePresence mode="wait" initial={false}>
+                {error ? (
+                  <motion.span
+                    key="refine-err"
+                    initial={{ opacity: 0, y: 4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -2 }}
+                    transition={{ duration: 0.24 }}
+                    className="text-wine"
+                  >
+                    {error}
+                  </motion.span>
+                ) : success ? (
+                  <motion.span
+                    key="refine-ok"
+                    initial={{ opacity: 0, y: 4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -2 }}
+                    transition={{ duration: 0.24 }}
+                    className="inline-flex items-center gap-1.5 italic font-serif"
+                    style={{ color: "var(--color-forest)" }}
+                  >
+                    <svg width="11" height="11" viewBox="0 0 12 12">
+                      <path
+                        d="M2 6.5 L5 9 L10 3.5"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.4"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                    Plato revised your email.
+                  </motion.span>
+                ) : null}
+              </AnimatePresence>
+            </div>
+
+            <motion.button
+              type="button"
+              onClick={onSubmit}
+              disabled={!canSubmit}
+              whileTap={{ scale: canSubmit ? 0.985 : 1 }}
+              className="inline-flex items-center gap-2 px-5 py-2.5 text-[0.85rem] smallcaps text-paper bg-wine hover:bg-wine-deep transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isRefining ? (
+                <>
+                  <motion.svg
+                    width="13"
+                    height="13"
+                    viewBox="0 0 16 16"
+                    aria-hidden="true"
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 0.8, ease: "linear", repeat: Infinity }}
+                  >
+                    <circle
+                      cx="8"
+                      cy="8"
+                      r="6"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeOpacity="0.35"
+                      strokeWidth="2"
+                    />
+                    <path
+                      d="M8 2 a6 6 0 0 1 6 6"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                    />
+                  </motion.svg>
+                  <span>Editing</span>
+                </>
+              ) : (
+                <>
+                  <span>Edit email</span>
+                  <span aria-hidden="true">→</span>
+                </>
+              )}
+            </motion.button>
+          </div>
+        </motion.section>
+      )}
+    </AnimatePresence>
+  );
+}
