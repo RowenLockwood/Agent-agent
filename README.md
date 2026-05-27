@@ -2,7 +2,7 @@
 
 > An Agent for Literary Agents.
 
-An internal tool for literary agents. V1 includes a **Client Library CRM** and a **Payment Email** generator.
+An internal tool for literary agents. V1 includes a **Client Library CRM**, a **Payment Email** generator, and an **Author Agreement Email** generator.
 
 ## Stack
 
@@ -43,13 +43,29 @@ Type an instruction — _"Make this warmer," "Make it more formal," "Shorten thi
 generated email rewritten in place.
 
 - Powered by the **OpenAI API** (Responses API, reasoning effort `high`).
-- The request runs entirely server-side via `POST /api/payment-email/refine`; the
-  API key is read from `OPENAI_API_KEY` on the server and **never** reaches the browser.
+- The request runs entirely server-side via `POST /api/email/refine` (with
+  `emailType: "payment"`); the API key is read from `OPENAI_API_KEY` on the server
+  and **never** reaches the browser.
 - The model is `OPENAI_MODEL` (default `gpt-5.5`). Change it if that model isn't
   available on your account — no code change required.
 - The model is instructed to preserve the factual payment details and to return the
   email text only. Revisions stay client-side; the generated email box remains fully
   editable and copyable. **This feature edits email text only — it never sends email.**
+
+### Author Agreement Email
+
+- Select an author from the Client Library, or type a name for an author who isn't
+  saved yet — the greeting uses that name.
+- The **Agent** field auto-fills from the selected author's head agent and stays
+  editable; it signs the email. The **Agency** field is entered manually and appears
+  in the body. All three fields are required before generating.
+- "Generate Email" produces a copy-pasteable email inviting the author to review and
+  sign the agency agreement.
+- An **Edit Email** revision panel appears once the email is generated — it shares the
+  same OpenAI setup as Payment Email. It uses the same `OPENAI_API_KEY` and
+  `OPENAI_MODEL`, runs server-side via `POST /api/email/refine` (with
+  `emailType: "author_agreement"`), and **only generates copy-pasteable email text —
+  it does not send email.**
 
 ## Known Limitations
 
@@ -156,8 +172,8 @@ src/
   app/
     actions.ts               Server actions (CRUD authors + editors, stage updates)
     api/
-      payment-email/
-        refine/route.ts      POST: revise a generated payment email via OpenAI
+      email/
+        refine/route.ts      POST: revise a generated email via OpenAI (emailType-aware)
     layout.tsx               Fonts + global shell
     globals.css              Editorial theme tokens + utilities
     page.tsx                 Root: initial data fetch → AppShell
@@ -178,7 +194,11 @@ src/
     FileUploadControl.tsx    Disabled upload control (placeholder)
 
     PaymentEmailCard.tsx     Payment email generator
-    AuthorPicker.tsx         Custom author listbox
+    AuthorAgreementEmail.tsx Author agreement email generator
+    AuthorPicker.tsx         Custom author listbox (select-only)
+    AuthorSelector.tsx       Author combobox (select a saved author or type a name)
+    EmailOutputBox.tsx       Shared copyable email output window
+    EmailRevisionPanel.tsx   Shared LLM "Edit Email" revision panel
     Field.tsx                Animated input + select primitives
     PlatoMark.tsx            Decorative ornament + hairline rule
 
@@ -187,7 +207,8 @@ src/
     authors.ts               Author Prisma queries
     editorOutreach.ts        EditorOutreach Prisma queries
     db.ts                    Lazy Prisma client (Neon HTTP adapter)
-    format.ts                USD formatting + payment email template
+    format.ts                USD formatting + payment/agreement email templates
+    refineEmailClient.ts     Client helper for POST /api/email/refine
     openai/
-      refinePaymentEmail.ts  Server-side OpenAI Responses call for email revision
+      refineEmail.ts         Server-side OpenAI Responses call (emailType-aware)
 ```

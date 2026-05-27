@@ -3,7 +3,7 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { PlatoMark } from "./PlatoMark";
 
-type Tab = 0 | 1;
+type Tab = 0 | 1 | 2;
 
 type Props = {
   activeTab: Tab;
@@ -34,6 +34,18 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
       <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true">
         <rect x="1" y="3" width="14" height="10" rx="0.5" stroke="currentColor" strokeWidth="1.2" />
         <path d="M1.5 3.5 L8 9 L14.5 3.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+  {
+    id: 2,
+    label: "Author Agreement Email",
+    icon: (
+      <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+        <rect x="3" y="1.5" width="10" height="13" rx="0.5" stroke="currentColor" strokeWidth="1.2" />
+        <line x1="5.5" y1="5" x2="10.5" y2="5" stroke="currentColor" strokeWidth="1" strokeLinecap="round" />
+        <line x1="5.5" y1="7" x2="10.5" y2="7" stroke="currentColor" strokeWidth="1" strokeLinecap="round" />
+        <path d="M5 11.2 c1 -1.5 2 -1.5 3 -0.2 c0.5 0.7 1.3 0.4 2 -0.5" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
     ),
   },

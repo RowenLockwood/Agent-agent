@@ -61,6 +61,26 @@ export function buildPaymentEmail(fields: EmailFields): string {
   ].join("\n");
 }
 
+export type AgreementEmailFields = {
+  authorName: string;
+  agency: string;
+  agentName: string;
+};
+
+export function buildAuthorAgreementEmail(fields: AgreementEmailFields): string {
+  const { authorName, agency, agentName } = fields;
+
+  return [
+    `Dear ${authorName || "[Author]"}:`,
+    "",
+    `Please find attached ${agency || "[Agency]"}'s agency agreement for your review. Please let us know if you have any questions or concerns. If all is in order, please let us know and we will circulate for automatic signature. Once both parties have signed, you will automatically receive a fully executed agreement for your records.`,
+    "",
+    "All best,",
+    "",
+    agentName || "[Your name]",
+  ].join("\n");
+}
+
 export const COMMISSION_TYPES = [
   "advance",
   "royalty",
