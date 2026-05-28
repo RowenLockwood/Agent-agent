@@ -66,11 +66,6 @@ generated email rewritten in place.
   `OPENAI_MODEL`, runs server-side via `POST /api/email/refine` (with
   `emailType: "author_agreement"`), and **only generates copy-pasteable email text —
   it does not send email.**
-- **Mark Onboarding Email Sent** — once the email is generated, a one-click action
-  advances the selected author's **Author Onboarded** stage from Not Started → In
-  Progress in the Client Library. It will not overwrite a stage that's already In
-  Progress or Completed (a subtle note explains when nothing changed), and the action
-  is unavailable when a manually typed author isn't saved in the Client Library.
 
 ## Known Limitations
 

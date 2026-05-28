@@ -137,7 +137,6 @@ export function AppShell({ initialAuthors, initialError }: Props) {
                 <AuthorAgreementWrapper
                   authors={authors}
                   authorsError={authorsError}
-                  onAuthorUpdated={handleAuthorUpdated}
                 />
               </motion.div>
             )}
@@ -188,11 +187,9 @@ function PaymentEmailWrapper({ authors }: { authors: AuthorRecord[] }) {
 function AuthorAgreementWrapper({
   authors,
   authorsError,
-  onAuthorUpdated,
 }: {
   authors: AuthorRecord[];
   authorsError: string | null;
-  onAuthorUpdated: (author: AuthorRecord) => void;
 }) {
   return (
     <div className="px-6 sm:px-10 lg:px-14 py-10 max-w-[860px]">
@@ -218,11 +215,7 @@ function AuthorAgreementWrapper({
           }}
         />
       </header>
-      <AuthorAgreementEmail
-        authors={authors}
-        authorsError={authorsError}
-        onAuthorUpdated={onAuthorUpdated}
-      />
+      <AuthorAgreementEmail authors={authors} authorsError={authorsError} />
     </div>
   );
 }
