@@ -7,7 +7,6 @@ import {
   deleteAuthor,
   listAuthors,
   updateAuthor,
-  updateAuthorStage,
   type AuthorRecord,
 } from "@/lib/authors";
 import {
@@ -18,7 +17,23 @@ import {
   updateEditorStage,
   type EditorOutreachRecord,
 } from "@/lib/editorOutreach";
-import type { AuthorStageField, EditorStageField } from "@/lib/stages";
+import {
+  ContractDetailsValidationError,
+  applyAuthorStageUpdate,
+  applyPaymentStageUpdate,
+  updateContractDetails,
+  type AuthorPaymentDetailsRecord,
+  type ContractDetailsPatch,
+  type RenewalIntervalUnit,
+} from "@/lib/paymentDetails";
+import { isRenewalIntervalUnit } from "@/lib/royalties";
+import {
+  PAYMENT_STAGE_FIELDS,
+  type AuthorStageField,
+  type AuthorStages,
+  type EditorStageField,
+  type PaymentStageField,
+} from "@/lib/stages";
 
 // ─── Authors ──────────────────────────────────────────────────────────────────
 
@@ -93,19 +108,100 @@ export async function listAuthorsAction(): Promise<ListAuthorsResult> {
   }
 }
 
-export type UpdateAuthorStageResult = { ok: true } | { ok: false; error: string };
+export type StageUpdateActionResult =
+  | {
+      ok: true;
+      authorStages: AuthorStages;
+      paymentDetails: AuthorPaymentDetailsRecord;
+    }
+  | { ok: false; error: string };
 
 export async function updateAuthorStageAction(
   authorId: string,
   field: AuthorStageField,
   value: string,
-): Promise<UpdateAuthorStageResult> {
+): Promise<StageUpdateActionResult> {
   try {
-    await updateAuthorStage(authorId, field, value);
-    return { ok: true };
+    const r = await applyAuthorStageUpdate(authorId, field, value);
+    return { ok: true, ...r };
   } catch (err) {
     console.error("updateAuthorStageAction", err);
     return { ok: false, error: "Could not update stage." };
+  }
+}
+
+export async function updatePaymentStageAction(
+  authorId: string,
+  field: PaymentStageField,
+  value: string,
+): Promise<StageUpdateActionResult> {
+  if (!PAYMENT_STAGE_FIELDS.includes(field)) {
+    return { ok: false, error: "Unknown stage." };
+  }
+  try {
+    const r = await applyPaymentStageUpdate(authorId, field, value);
+    return { ok: true, ...r };
+  } catch (err) {
+    console.error("updatePaymentStageAction", err);
+    return { ok: false, error: "Could not update stage." };
+  }
+}
+
+const contractDetailsSchema = z.object({
+  commissionAmount: z
+    .union([z.number(), z.null()])
+    .optional(),
+  commissionPercentForAgency: z
+    .union([z.number(), z.null()])
+    .optional(),
+  firstRoyaltyStatementDate: z
+    .union([z.string(), z.null()])
+    .optional(),
+  renewalIntervalNumber: z
+    .union([z.number(), z.null()])
+    .optional(),
+  renewalIntervalUnit: z
+    .union([
+      z.string().refine(isRenewalIntervalUnit, "Renewal interval unit must be Weeks or Months."),
+      z.null(),
+    ])
+    .optional(),
+  lastSentToAuthorDate: z
+    .union([z.string(), z.null()])
+    .optional(),
+});
+
+export type UpdateContractDetailsResult =
+  | { ok: true; paymentDetails: AuthorPaymentDetailsRecord }
+  | { ok: false; error: string };
+
+export async function updateContractDetailsAction(
+  authorId: string,
+  raw: unknown,
+): Promise<UpdateContractDetailsResult> {
+  const parsed = contractDetailsSchema.safeParse(raw);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      error: parsed.error.issues[0]?.message ?? "Invalid input.",
+    };
+  }
+  const patch: ContractDetailsPatch = {
+    ...parsed.data,
+    renewalIntervalUnit:
+      parsed.data.renewalIntervalUnit == null
+        ? parsed.data.renewalIntervalUnit
+        : (parsed.data.renewalIntervalUnit as RenewalIntervalUnit),
+  };
+  try {
+    const paymentDetails = await updateContractDetails(authorId, patch);
+    return { ok: true, paymentDetails };
+  } catch (err) {
+    if (err instanceof ContractDetailsValidationError) {
+      return { ok: false, error: err.message };
+    }
+    console.error("updateContractDetailsAction", err);
+    return { ok: false, error: "Could not save contract details." };
   }
 }
 
