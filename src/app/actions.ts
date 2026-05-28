@@ -1,6 +1,7 @@
 "use server";
 
 import { z } from "zod";
+import { updateAgencyName } from "@/lib/appSettings";
 import {
   createAuthor,
   deleteAuthor,
@@ -105,6 +106,27 @@ export async function updateAuthorStageAction(
   } catch (err) {
     console.error("updateAuthorStageAction", err);
     return { ok: false, error: "Could not update stage." };
+  }
+}
+
+// ─── App Settings ─────────────────────────────────────────────────────────────
+
+export type UpdateAgencyNameResult =
+  | { ok: true; agencyName: string }
+  | { ok: false; error: string };
+
+export async function updateAgencyNameAction(
+  value: unknown,
+): Promise<UpdateAgencyNameResult> {
+  if (typeof value !== "string") {
+    return { ok: false, error: "Invalid input." };
+  }
+  try {
+    const result = await updateAgencyName(value);
+    return { ok: true, agencyName: result.agencyName };
+  } catch (err) {
+    console.error("updateAgencyNameAction", err);
+    return { ok: false, error: "Could not save the agency name." };
   }
 }
 

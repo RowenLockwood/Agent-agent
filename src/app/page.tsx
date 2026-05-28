@@ -1,4 +1,5 @@
 import { AppShell } from "@/components/AppShell";
+import { getAppSettings } from "@/lib/appSettings";
 import { listAuthors, type AuthorRecord } from "@/lib/authors";
 
 export const dynamic = "force-dynamic";
@@ -14,7 +15,18 @@ export default async function Page() {
       "Couldn't reach the database. Check DATABASE_URL and run migrations.";
   }
 
+  let initialAgencyName = "";
+  try {
+    initialAgencyName = (await getAppSettings()).agencyName;
+  } catch (err) {
+    console.error("Failed to load app settings", err);
+  }
+
   return (
-    <AppShell initialAuthors={initialAuthors} initialError={initialError} />
+    <AppShell
+      initialAuthors={initialAuthors}
+      initialError={initialError}
+      initialAgencyName={initialAgencyName}
+    />
   );
 }

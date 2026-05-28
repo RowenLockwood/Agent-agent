@@ -14,13 +14,19 @@ type Tab = 0 | 1 | 2;
 type Props = {
   initialAuthors: AuthorRecord[];
   initialError: string | null;
+  initialAgencyName: string;
 };
 
-export function AppShell({ initialAuthors, initialError }: Props) {
+export function AppShell({
+  initialAuthors,
+  initialError,
+  initialAgencyName,
+}: Props) {
   const [activeTab, setActiveTab] = useState<Tab>(0);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [authors, setAuthors] = useState<AuthorRecord[]>(initialAuthors);
   const [authorsError, setAuthorsError] = useState<string | null>(initialError);
+  const [agencyName, setAgencyName] = useState(initialAgencyName);
 
   // Retry once on mount if initial fetch failed
   useEffect(() => {
@@ -109,6 +115,8 @@ export function AppShell({ initialAuthors, initialError }: Props) {
                 <ClientLibrary
                   authors={authors}
                   authorsError={authorsError}
+                  agencyName={agencyName}
+                  onAgencyNameSaved={setAgencyName}
                   onAdded={handleAuthorAdded}
                   onUpdated={handleAuthorUpdated}
                   onDeleted={handleAuthorDeleted}
@@ -137,6 +145,7 @@ export function AppShell({ initialAuthors, initialError }: Props) {
                 <AuthorAgreementWrapper
                   authors={authors}
                   authorsError={authorsError}
+                  defaultAgencyName={agencyName}
                 />
               </motion.div>
             )}
@@ -187,9 +196,11 @@ function PaymentEmailWrapper({ authors }: { authors: AuthorRecord[] }) {
 function AuthorAgreementWrapper({
   authors,
   authorsError,
+  defaultAgencyName,
 }: {
   authors: AuthorRecord[];
   authorsError: string | null;
+  defaultAgencyName: string;
 }) {
   return (
     <div className="px-6 sm:px-10 lg:px-14 py-10 max-w-[860px]">
@@ -215,7 +226,11 @@ function AuthorAgreementWrapper({
           }}
         />
       </header>
-      <AuthorAgreementEmail authors={authors} authorsError={authorsError} />
+      <AuthorAgreementEmail
+        authors={authors}
+        authorsError={authorsError}
+        defaultAgencyName={defaultAgencyName}
+      />
     </div>
   );
 }
