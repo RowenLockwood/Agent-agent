@@ -11,6 +11,7 @@ export type AuthorRecord = {
   headAgent: string;
   headAgentEmail: string;
   assignedAssistant: string;
+  authorOnboarded: string;
   proposalSentToEditors: string;
   authorMeetings: string;
   bidSent: string;
@@ -43,6 +44,7 @@ type AuthorRow = {
   headAgent: string;
   headAgentEmail: string;
   assignedAssistant: string;
+  authorOnboarded: string;
   proposalSentToEditors: string;
   authorMeetings: string;
   bidSent: string;
@@ -89,4 +91,22 @@ export async function updateAuthorStage(
     where: { id: authorId },
     data: { [field]: value },
   });
+}
+
+/**
+ * Advance an author's onboarding stage when their agreement email is sent.
+ * Only promotes "not_started" → "in_progress"; never overwrites "in_progress"
+ * or "completed". The conditional `updateMany` makes the no-downgrade rule
+ * atomic. Returns the current record and whether anything changed.
+ */
+export async function markAuthorOnboardingSent(
+  id: string,
+): Promise<{ author: AuthorRecord; changed: boolean }> {
+  const res = await prisma.author.updateMany({
+    where: { id, authorOnboarded: "not_started" },
+    data: { authorOnboarded: "in_progress" },
+  });
+  const row = await prisma.author.findUnique({ where: { id } });
+  if (!row) throw new Error("Author not found.");
+  return { author: serialize(row), changed: res.count > 0 };
 }

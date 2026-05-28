@@ -15,6 +15,7 @@ export const AUTHOR_STAGE_STATUS_LABELS: Record<AuthorStageStatus, string> = {
 };
 
 export type AuthorStageField =
+  | "authorOnboarded"
   | "proposalSentToEditors"
   | "authorMeetings"
   | "bidSent"
@@ -24,6 +25,7 @@ export type AuthorStageField =
   | "paymentSentToAuthor";
 
 export const AUTHOR_STAGE_FIELDS: AuthorStageField[] = [
+  "authorOnboarded",
   "proposalSentToEditors",
   "authorMeetings",
   "bidSent",
@@ -34,14 +36,17 @@ export const AUTHOR_STAGE_FIELDS: AuthorStageField[] = [
 ];
 
 export const AUTHOR_STAGE_FIELD_LABELS: Record<AuthorStageField, string> = {
-  proposalSentToEditors: "Book Proposal Sent",
-  authorMeetings: "Author Meetings",
+  authorOnboarded: "Author Onboarded",
+  proposalSentToEditors: "Book Proposal Sent to Editors",
+  authorMeetings: "1-1 Author Meetings",
   bidSent: "Bid Sent",
   dealMemoSent: "Deal Memo Sent",
   dealMemoAccepted: "Deal Memo Accepted",
   paymentReceived: "Payment Received",
   paymentSentToAuthor: "Payment Sent to Author",
 };
+
+export type AuthorStages = Record<AuthorStageField, string>;
 
 /** CSS colour string for an author-level diamond. */
 export function authorStageColor(status: AuthorStageStatus): string {
@@ -54,6 +59,85 @@ export function authorStageGlow(status: AuthorStageStatus): string {
   if (status === "completed") return "0 0 8px 2px rgba(26,92,58,0.55)";
   if (status === "in_progress") return "0 0 8px 2px rgba(154,110,15,0.55)";
   return "0 0 8px 2px rgba(107,26,37,0.55)";
+}
+
+/** Muted gray for a locked author stage; otherwise the status colour. */
+export function authorStageCssColor(
+  status: AuthorStageStatus,
+  locked: boolean,
+): string {
+  if (locked) return "#b0a898";
+  return authorStageColor(status);
+}
+
+// ─── Author stage unlock logic ────────────────────────────────────────────────
+
+// Each stage unlocks once its immediate predecessor is Completed. Checking the
+// predecessor's locked state (not just its value) makes locking cascade: moving
+// an earlier stage back from Completed re-locks every stage that follows it.
+export function authorStageLocked(
+  field: AuthorStageField,
+  stages: AuthorStages,
+): boolean {
+  switch (field) {
+    case "authorOnboarded":
+      return false;
+    case "proposalSentToEditors":
+      return (
+        authorStageLocked("authorOnboarded", stages) ||
+        stages.authorOnboarded !== "completed"
+      );
+    case "authorMeetings":
+      return (
+        authorStageLocked("proposalSentToEditors", stages) ||
+        stages.proposalSentToEditors !== "completed"
+      );
+    case "bidSent":
+      return (
+        authorStageLocked("authorMeetings", stages) ||
+        stages.authorMeetings !== "completed"
+      );
+    case "dealMemoSent":
+      return (
+        authorStageLocked("bidSent", stages) || stages.bidSent !== "completed"
+      );
+    case "dealMemoAccepted":
+      return (
+        authorStageLocked("dealMemoSent", stages) ||
+        stages.dealMemoSent !== "completed"
+      );
+    case "paymentReceived":
+      return (
+        authorStageLocked("dealMemoAccepted", stages) ||
+        stages.dealMemoAccepted !== "completed"
+      );
+    case "paymentSentToAuthor":
+      return (
+        authorStageLocked("paymentReceived", stages) ||
+        stages.paymentReceived !== "completed"
+      );
+  }
+}
+
+export function authorStageLockReason(field: AuthorStageField): string {
+  switch (field) {
+    case "proposalSentToEditors":
+      return "Unlocks when Author Onboarded is Completed";
+    case "authorMeetings":
+      return "Unlocks when Book Proposal Sent to Editors is Completed";
+    case "bidSent":
+      return "Unlocks when 1-1 Author Meetings is Completed";
+    case "dealMemoSent":
+      return "Unlocks when Bid Sent is Completed";
+    case "dealMemoAccepted":
+      return "Unlocks when Deal Memo Sent is Completed";
+    case "paymentReceived":
+      return "Unlocks when Deal Memo Accepted is Completed";
+    case "paymentSentToAuthor":
+      return "Unlocks when Payment Received is Completed";
+    default:
+      return "";
+  }
 }
 
 // ─── Editor-level stages ──────────────────────────────────────────────────────

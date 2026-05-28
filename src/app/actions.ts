@@ -5,6 +5,7 @@ import {
   createAuthor,
   deleteAuthor,
   listAuthors,
+  markAuthorOnboardingSent,
   updateAuthor,
   updateAuthorStage,
   type AuthorRecord,
@@ -105,6 +106,26 @@ export async function updateAuthorStageAction(
   } catch (err) {
     console.error("updateAuthorStageAction", err);
     return { ok: false, error: "Could not update stage." };
+  }
+}
+
+export type MarkOnboardingResult =
+  | { ok: true; author: AuthorRecord; changed: boolean }
+  | { ok: false; error: string };
+
+export async function markAuthorOnboardingEmailSentAction(
+  authorId: string,
+): Promise<MarkOnboardingResult> {
+  if (!authorId) return { ok: false, error: "Select a saved author first." };
+  try {
+    const { author, changed } = await markAuthorOnboardingSent(authorId);
+    return { ok: true, author, changed };
+  } catch (err) {
+    console.error("markAuthorOnboardingEmailSentAction", err);
+    return {
+      ok: false,
+      error: "Could not update the author's onboarding stage.",
+    };
   }
 }
 

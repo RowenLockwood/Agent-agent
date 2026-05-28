@@ -9,7 +9,7 @@ import {
 } from "@/app/actions";
 import type { AuthorRecord } from "@/lib/authors";
 import type { EditorOutreachRecord } from "@/lib/editorOutreach";
-import type { AuthorStageField } from "@/lib/stages";
+import type { AuthorStageField, AuthorStages } from "@/lib/stages";
 import { AuthorStageTimeline } from "./AuthorStageTimeline";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { EditorOutreachTable } from "./EditorOutreachTable";
@@ -20,10 +20,9 @@ type Props = {
   onDeleted: (id: string) => void;
 };
 
-type AuthorStages = Record<AuthorStageField, string>;
-
 function stagesFromAuthor(a: AuthorRecord): AuthorStages {
   return {
+    authorOnboarded: a.authorOnboarded,
     proposalSentToEditors: a.proposalSentToEditors,
     authorMeetings: a.authorMeetings,
     bidSent: a.bidSent,

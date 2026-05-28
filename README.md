@@ -22,7 +22,7 @@ A polished CRM for tracking authors and their publishing pipelines.
 
 - **Add Author** — centered modal capturing first/last name, book title, genre, author email, head agent, head agent email, and assigned assistant. All fields are required. The modal also hosts the **Upload Editor List** control (per-author; import parsing is stubbed for a future release).
 - **Edit / Delete Author** — every author row has Edit (reopens the modal pre-filled) and Delete (guarded by a confirmation dialog; cascade-deletes that author's editors).
-- **Author stages** — a row of seven labeled squares (Book Proposal Sent → Payment Sent to Author). Each square shows the stage name plus its current status; click to change it. Updates immediately via optimistic UI. Statuses: Not Started / In Progress / Completed.
+- **Author stages** — a row of eight labeled squares (Author Onboarded → Payment Sent to Author). Each square shows the stage name plus its current status; click to change it. Updates immediately via optimistic UI. Statuses: Not Started / In Progress / Completed. Later stages stay **Locked** (gray) until the prior stage reaches Completed, with a hover tooltip explaining what to do first.
 - **Editor outreach** — expand any author row to reveal that author's editors as cards. Add, edit, and delete editors (delete is confirmation-guarded). Each editor has six labeled stage squares (Book Proposal → Payment Sent to Author) with stage-specific options and sequential unlock logic (later stages stay locked until the prior stage advances).
 
 ### Payment Email
@@ -66,6 +66,11 @@ generated email rewritten in place.
   `OPENAI_MODEL`, runs server-side via `POST /api/email/refine` (with
   `emailType: "author_agreement"`), and **only generates copy-pasteable email text —
   it does not send email.**
+- **Mark Onboarding Email Sent** — once the email is generated, a one-click action
+  advances the selected author's **Author Onboarded** stage from Not Started → In
+  Progress in the Client Library. It will not overwrite a stage that's already In
+  Progress or Completed (a subtle note explains when nothing changed), and the action
+  is unavailable when a manually typed author isn't saved in the Client Library.
 
 ## Known Limitations
 
@@ -79,8 +84,8 @@ generated email rewritten in place.
 Author
   id, firstName, lastName, title, genre, email, headAgent, headAgentEmail,
   assignedAssistant  (all required)
-  proposalSentToEditors, authorMeetings, bidSent, dealMemoSent, dealMemoAccepted,
-  paymentReceived, paymentSentToAuthor  (all String, default "not_started")
+  authorOnboarded, proposalSentToEditors, authorMeetings, bidSent, dealMemoSent,
+  dealMemoAccepted, paymentReceived, paymentSentToAuthor  (all String, default "not_started")
   createdAt, updatedAt
 
 EditorOutreach
@@ -144,6 +149,8 @@ Open [http://localhost:3000](http://localhost:3000).
 
 **Required fields + Title/Genre** (migration `20260524000002_required_title_genre`): Adds required `title` and `genre` to `Author`, and makes the remaining `Author` text fields (`email`, `headAgent`, `headAgentEmail`, `assignedAssistant`) and `EditorOutreach` (`editorEmail`, `publishingHouse`) `NOT NULL`. Existing `NULL`s are backfilled to empty strings before the constraints apply, so the migration is safe on a populated database.
 
+**Author Onboarded stage** (migration `20260528000000_author_onboarded_stage`): Adds the new `Author.authorOnboarded` column as the first author-level stage. The column is `NOT NULL` with a default of `'not_started'`, so existing authors are preserved and automatically backfilled.
+
 ## Scripts
 
 | Script | What it does |
@@ -167,6 +174,7 @@ prisma/
     20260524000000_init/       Initial schema
     20260524000001_client_library/  Author model rebuild + EditorOutreach
     20260524000002_required_title_genre/  Title/Genre + required fields
+    20260528000000_author_onboarded_stage/  Adds Author.authorOnboarded (first author stage)
 
 src/
   app/

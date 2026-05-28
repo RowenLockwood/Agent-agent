@@ -22,6 +22,7 @@ model Author {
 
   // Author-level publishing pipeline stages
   // Values: "not_started" | "in_progress" | "completed"
+  authorOnboarded       String   @default("not_started")
   proposalSentToEditors String   @default("not_started")
   authorMeetings        String   @default("not_started")
   bidSent               String   @default("not_started")
