@@ -51,7 +51,7 @@ export function ClientLibrary({
       >
         <div className="flex flex-wrap items-start gap-y-5 gap-x-8 justify-between">
           <div className="flex-1 min-w-0">
-            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-2 pr-2">
+            <div className="flex flex-wrap items-baseline gap-x-2 sm:gap-x-2.5 gap-y-2 pr-2">
               <h1
                 className="font-serif text-[2rem] sm:text-[2.5rem] leading-none whitespace-nowrap"
                 style={{ color: "var(--color-ink)" }}

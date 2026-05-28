@@ -1,7 +1,12 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { useEffect, useRef, useState } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { updateAgencyNameAction } from "@/app/actions";
 
 type SaveStatus = "idle" | "saving" | "saved" | "error";
@@ -12,15 +17,22 @@ type Props = {
   onSaved: (value: string) => void;
 };
 
+const PLACEHOLDER = "Agency Name";
 const DEBOUNCE_MS = 650;
 const SAVED_FLASH_MS = 1400;
 const ERROR_FLASH_MS = 3200;
+
+// SSR-safe layout effect: layout effects warn and aren't useful on the server.
+const useIsoLayoutEffect =
+  typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
 export function AgencyNameInput({ initialValue, onSaved }: Props) {
   const [value, setValue] = useState(initialValue);
   const [savedValue, setSavedValue] = useState(initialValue);
   const [status, setStatus] = useState<SaveStatus>("idle");
+  const [width, setWidth] = useState<number | null>(null);
 
+  const mirrorRef = useRef<HTMLSpanElement>(null);
   const flashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inFlightRef = useRef(false);
 
@@ -31,9 +43,8 @@ export function AgencyNameInput({ initialValue, onSaved }: Props) {
     [],
   );
 
-  // Debounced auto-save on every keystroke. We only save if the trimmed value
-  // actually differs from what the server last confirmed, so opening a saved
-  // value and tabbing away doesn't re-save it.
+  // Debounced auto-save. Skips when the trimmed value matches what the server
+  // last confirmed, so opening the page and tabbing away doesn't re-save.
   useEffect(() => {
     const next = value.trim();
     if (next === savedValue) return;
@@ -67,6 +78,15 @@ export function AgencyNameInput({ initialValue, onSaved }: Props) {
     return () => clearTimeout(id);
   }, [value, savedValue, onSaved]);
 
+  // Size the input to fit its current value (or placeholder, when empty) by
+  // measuring a hidden mirror span that shares the input's font properties.
+  // The +2px buffer leaves room for the caret at the end of the line.
+  useIsoLayoutEffect(() => {
+    if (mirrorRef.current) {
+      setWidth(mirrorRef.current.offsetWidth + 2);
+    }
+  }, [value]);
+
   const statusText =
     status === "saving"
       ? "Saving…"
@@ -77,30 +97,43 @@ export function AgencyNameInput({ initialValue, onSaved }: Props) {
           : "";
 
   return (
-    <div className="relative flex-1 min-w-[160px] sm:min-w-[260px]">
+    <span className="relative inline-flex items-baseline">
+      <span
+        ref={mirrorRef}
+        aria-hidden="true"
+        className="invisible absolute top-0 left-0 font-serif text-[2rem] sm:text-[2.5rem] leading-none whitespace-pre"
+      >
+        {value || PLACEHOLDER}
+      </span>
       <input
         type="text"
         value={value}
         onChange={(e) => setValue(e.currentTarget.value)}
-        placeholder="Agency Name"
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            e.currentTarget.blur();
+          }
+        }}
+        placeholder={PLACEHOLDER}
         aria-label="Agency Name"
         spellCheck={false}
         autoComplete="off"
-        className="w-full bg-transparent font-serif italic text-[1.7rem] sm:text-[2.2rem] leading-none px-0 py-1 outline-none border-b transition-colors focus:border-ink"
+        className="bg-transparent font-serif text-[2rem] sm:text-[2.5rem] leading-none px-0 py-0 outline-none border-0 placeholder:text-ink-muted placeholder:opacity-55"
         style={{
           color: "var(--color-ink)",
-          borderColor: "var(--color-rule)",
+          width: width != null ? `${width}px` : "auto",
         }}
       />
-      <div
+      <span
         aria-live="polite"
-        className="absolute right-0 -bottom-5 smallcaps text-[0.68rem] pointer-events-none select-none"
+        className="absolute -bottom-4 left-0 smallcaps text-[0.62rem] pointer-events-none select-none whitespace-nowrap"
       >
         <AnimatePresence mode="wait">
           {statusText && (
             <motion.span
               key={statusText}
-              initial={{ opacity: 0, y: 2 }}
+              initial={{ opacity: 0, y: 1 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -1 }}
               transition={{ duration: 0.22 }}
@@ -115,7 +148,7 @@ export function AgencyNameInput({ initialValue, onSaved }: Props) {
             </motion.span>
           )}
         </AnimatePresence>
-      </div>
-    </div>
+      </span>
+    </span>
   );
 }
