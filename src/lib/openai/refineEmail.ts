@@ -1,8 +1,12 @@
 import OpenAI from "openai";
 
-export type RefinePaymentEmailInput = {
+export type EmailType = "payment" | "author_agreement";
+
+export type RefineEmailInput = {
+  emailType: EmailType;
   initialEmail: string;
   userInstruction: string;
+  // Payment metadata
   authorName?: string;
   title?: string;
   publisher?: string;
@@ -10,6 +14,9 @@ export type RefinePaymentEmailInput = {
   totalPayment?: string;
   authorPayment?: string;
   commissionType?: string;
+  // Author-agreement metadata
+  agency?: string;
+  agentName?: string;
 };
 
 /**
@@ -34,30 +41,51 @@ const DEFAULT_MODEL = "gpt-5.5";
 // output budget on hidden reasoning tokens before the visible email.
 const MAX_OUTPUT_TOKENS = 8000;
 
-const SYSTEM_INSTRUCTION = [
-  "You are helping a literary agent adjust an email, likely to an external author, about their payment.",
-  "Return only the adjusted email.",
-  "Do not include commentary, explanations, markdown fences, subject lines, or notes.",
-  "Preserve the factual payment details unless the user explicitly asks to change wording around them.",
-  "Maintain a professional, clear, warm literary-agency tone.",
-  "Do not invent new payment amounts, publishers, titles, editors, or author details.",
-  "If the user asks for a tone change, keep every payment fact intact.",
-  "If the user asks to change a factual detail, treat it strictly as a wording revision and never recalculate or fabricate values.",
-].join(" ");
+const SYSTEM_INSTRUCTION: Record<EmailType, string> = {
+  payment: [
+    "You are helping a literary agent adjust an email, likely to an external author, about their payment.",
+    "Return only the adjusted email.",
+    "Do not include commentary, explanations, markdown fences, subject lines, or notes.",
+    "Preserve the factual payment details unless the user explicitly asks to change wording around them.",
+    "Maintain a professional, clear, warm literary-agency tone.",
+    "Do not invent new payment amounts, publishers, titles, editors, or author details.",
+    "If the user asks for a tone change, keep every payment fact intact.",
+    "If the user asks to change a factual detail, treat it strictly as a wording revision and never recalculate or fabricate values.",
+  ].join(" "),
+  author_agreement: [
+    "You are helping a literary agent adjust an email to an author about reviewing and signing an agency agreement.",
+    "Return only the adjusted email.",
+    "Do not include commentary, explanations, markdown fences, subject lines, or notes.",
+    "Preserve the factual details unless the user explicitly asks to change wording around them.",
+    "Maintain a professional, clear, warm literary-agency tone.",
+  ].join(" "),
+};
 
-function buildInput(input: RefinePaymentEmailInput): string {
+const METADATA_HEADING: Record<EmailType, string> = {
+  payment: "Available payment metadata:",
+  author_agreement: "Available agreement metadata:",
+};
+
+function buildInput(input: RefineEmailInput): string {
   const meta: string[] = [];
   const add = (label: string, value?: string) => {
     const v = value?.trim();
     if (v) meta.push(`  ${label}: ${v}`);
   };
-  add("Author", input.authorName);
-  add("Title", input.title);
-  add("Publisher", input.publisher);
-  add("Editor Name", input.editorName);
-  add("Total Payment", input.totalPayment);
-  add("Author Payment After Commission", input.authorPayment);
-  add("Commission Type", input.commissionType);
+
+  if (input.emailType === "payment") {
+    add("Author", input.authorName);
+    add("Title", input.title);
+    add("Publisher", input.publisher);
+    add("Editor Name", input.editorName);
+    add("Total Payment", input.totalPayment);
+    add("Author Payment After Commission", input.authorPayment);
+    add("Commission Type", input.commissionType);
+  } else {
+    add("Author", input.authorName);
+    add("Agency", input.agency);
+    add("Agent (email signature)", input.agentName);
+  }
 
   const parts = [
     "- Original email:",
@@ -67,7 +95,7 @@ function buildInput(input: RefinePaymentEmailInput): string {
     input.userInstruction.trim(),
   ];
   if (meta.length > 0) {
-    parts.push("", "- Available payment metadata:", ...meta);
+    parts.push("", `- ${METADATA_HEADING[input.emailType]}`, ...meta);
   }
   parts.push("", "Return only the revised email.");
   return parts.join("\n");
@@ -104,7 +132,7 @@ function toRefineError(err: unknown): RefineEmailError {
     }
   }
   // Opaque failure — log the detail server-side, never leak it to the client.
-  console.error("refinePaymentEmail", err);
+  console.error("refineEmail", err);
   return new RefineEmailError(
     "Plato couldn't reach the email editor. Please try again.",
     502,
@@ -112,12 +140,11 @@ function toRefineError(err: unknown): RefineEmailError {
 }
 
 /**
- * Revise a generated payment email via the OpenAI Responses API. Server-side
- * only — the API key never leaves this module's process.
+ * Revise a generated email via the OpenAI Responses API. Server-side only — the
+ * API key never leaves this module's process. The `emailType` selects the
+ * system instruction and the metadata Plato is allowed to lean on.
  */
-export async function refinePaymentEmail(
-  input: RefinePaymentEmailInput,
-): Promise<string> {
+export async function refineEmail(input: RefineEmailInput): Promise<string> {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     throw new RefineEmailError(
@@ -134,7 +161,7 @@ export async function refinePaymentEmail(
     response = await client.responses.create({
       model,
       reasoning: { effort: "high" },
-      instructions: SYSTEM_INSTRUCTION,
+      instructions: SYSTEM_INSTRUCTION[input.emailType],
       input: buildInput(input),
       max_output_tokens: MAX_OUTPUT_TOKENS,
     });

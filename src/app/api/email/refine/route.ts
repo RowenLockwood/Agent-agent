@@ -1,15 +1,15 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import {
-  refinePaymentEmail,
-  RefineEmailError,
-} from "@/lib/openai/refinePaymentEmail";
+import { refineEmail, RefineEmailError } from "@/lib/openai/refineEmail";
 
 export const runtime = "nodejs";
 
 const optionalMeta = z.string().trim().max(400).optional();
 
 const bodySchema = z.object({
+  emailType: z.enum(["payment", "author_agreement"], {
+    error: "Unknown email type.",
+  }),
   initialEmail: z
     .string({ error: "No email to revise yet." })
     .trim()
@@ -20,6 +20,7 @@ const bodySchema = z.object({
     .trim()
     .min(1, "Tell Plato how you'd like to revise the email.")
     .max(1000, "Keep the revision instruction under 1,000 characters."),
+  // Payment metadata
   authorName: optionalMeta,
   title: optionalMeta,
   publisher: optionalMeta,
@@ -27,6 +28,9 @@ const bodySchema = z.object({
   totalPayment: optionalMeta,
   authorPayment: optionalMeta,
   commissionType: optionalMeta,
+  // Author-agreement metadata
+  agency: optionalMeta,
+  agentName: optionalMeta,
 });
 
 export async function POST(req: Request) {
@@ -46,7 +50,7 @@ export async function POST(req: Request) {
   }
 
   try {
-    const revisedEmail = await refinePaymentEmail(parsed.data);
+    const revisedEmail = await refineEmail(parsed.data);
     return NextResponse.json({ revisedEmail });
   } catch (err) {
     if (err instanceof RefineEmailError) {
@@ -55,7 +59,7 @@ export async function POST(req: Request) {
         { status: err.status },
       );
     }
-    console.error("POST /api/payment-email/refine", err);
+    console.error("POST /api/email/refine", err);
     return NextResponse.json(
       { error: "Plato couldn't revise the email just now. Please try again." },
       { status: 502 },

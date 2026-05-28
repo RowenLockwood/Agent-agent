@@ -11,6 +11,7 @@ export type AuthorRecord = {
   headAgent: string;
   headAgentEmail: string;
   assignedAssistant: string;
+  authorOnboarded: string;
   proposalSentToEditors: string;
   authorMeetings: string;
   bidSent: string;
@@ -43,6 +44,7 @@ type AuthorRow = {
   headAgent: string;
   headAgentEmail: string;
   assignedAssistant: string;
+  authorOnboarded: string;
   proposalSentToEditors: string;
   authorMeetings: string;
   bidSent: string;

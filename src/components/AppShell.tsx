@@ -7,9 +7,9 @@ import type { AuthorRecord } from "@/lib/authors";
 import { SidebarNav } from "./SidebarNav";
 import { ClientLibrary } from "./ClientLibrary";
 import { PaymentEmailCard } from "./PaymentEmailCard";
-import { AuthorPicker } from "./AuthorPicker";
+import { AuthorAgreementEmail } from "./AuthorAgreementEmail";
 
-type Tab = 0 | 1;
+type Tab = 0 | 1 | 2;
 
 type Props = {
   initialAuthors: AuthorRecord[];
@@ -47,7 +47,11 @@ export function AppShell({ initialAuthors, initialError }: Props) {
     setAuthors((prev) => prev.filter((a) => a.id !== id));
   }
 
-  const TAB_NAMES: Record<Tab, string> = { 0: "Client Library", 1: "Payment Email" };
+  const TAB_NAMES: Record<Tab, string> = {
+    0: "Client Library",
+    1: "Payment Email",
+    2: "Author Agreement Email",
+  };
 
   return (
     <div className="flex h-full">
@@ -110,7 +114,7 @@ export function AppShell({ initialAuthors, initialError }: Props) {
                   onDeleted={handleAuthorDeleted}
                 />
               </motion.div>
-            ) : (
+            ) : activeTab === 1 ? (
               <motion.div
                 key="payment-email"
                 initial={{ opacity: 0, y: 6 }}
@@ -120,6 +124,20 @@ export function AppShell({ initialAuthors, initialError }: Props) {
                 className="h-full overflow-auto"
               >
                 <PaymentEmailWrapper authors={authors} />
+              </motion.div>
+            ) : (
+              <motion.div
+                key="author-agreement-email"
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -6 }}
+                transition={{ duration: 0.25, ease: [0.2, 0.6, 0.2, 1] }}
+                className="h-full overflow-auto"
+              >
+                <AuthorAgreementWrapper
+                  authors={authors}
+                  authorsError={authorsError}
+                />
               </motion.div>
             )}
           </AnimatePresence>
@@ -162,6 +180,42 @@ function PaymentEmailWrapper({ authors }: { authors: AuthorRecord[] }) {
         selectedId={selectedId}
         onSelect={setSelectedId}
       />
+    </div>
+  );
+}
+
+function AuthorAgreementWrapper({
+  authors,
+  authorsError,
+}: {
+  authors: AuthorRecord[];
+  authorsError: string | null;
+}) {
+  return (
+    <div className="px-6 sm:px-10 lg:px-14 py-10 max-w-[860px]">
+      <header className="mb-10">
+        <h1
+          className="font-serif text-[2rem] sm:text-[2.5rem] leading-none"
+          style={{ color: "var(--color-ink)" }}
+        >
+          Author Agreement Email
+        </h1>
+        <p
+          className="mt-2 font-serif italic text-[1.05rem]"
+          style={{ color: "var(--color-ink-muted)" }}
+        >
+          Invite an author to review and sign your agency agreement.
+        </p>
+        <div
+          className="mt-6"
+          style={{
+            height: "1px",
+            background:
+              "linear-gradient(to right, var(--color-rule), transparent 75%)",
+          }}
+        />
+      </header>
+      <AuthorAgreementEmail authors={authors} authorsError={authorsError} />
     </div>
   );
 }

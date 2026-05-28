@@ -2,7 +2,7 @@
 
 > An Agent for Literary Agents.
 
-An internal tool for literary agents. V1 includes a **Client Library CRM** and a **Payment Email** generator.
+An internal tool for literary agents. V1 includes a **Client Library CRM**, a **Payment Email** generator, and an **Author Agreement Email** generator.
 
 ## Stack
 
@@ -22,7 +22,7 @@ A polished CRM for tracking authors and their publishing pipelines.
 
 - **Add Author** — centered modal capturing first/last name, book title, genre, author email, head agent, head agent email, and assigned assistant. All fields are required. The modal also hosts the **Upload Editor List** control (per-author; import parsing is stubbed for a future release).
 - **Edit / Delete Author** — every author row has Edit (reopens the modal pre-filled) and Delete (guarded by a confirmation dialog; cascade-deletes that author's editors).
-- **Author stages** — a row of seven labeled squares (Book Proposal Sent → Payment Sent to Author). Each square shows the stage name plus its current status; click to change it. Updates immediately via optimistic UI. Statuses: Not Started / In Progress / Completed.
+- **Author stages** — a row of eight labeled squares (Author Onboarded → Payment Sent to Author). Each square shows the stage name plus its current status; click to change it. Updates immediately via optimistic UI. Statuses: Not Started / In Progress / Completed. Later stages stay **Locked** (gray) until the prior stage reaches Completed, with a hover tooltip explaining what to do first.
 - **Editor outreach** — expand any author row to reveal that author's editors as cards. Add, edit, and delete editors (delete is confirmation-guarded). Each editor has six labeled stage squares (Book Proposal → Payment Sent to Author) with stage-specific options and sequential unlock logic (later stages stay locked until the prior stage advances).
 
 ### Payment Email
@@ -43,13 +43,29 @@ Type an instruction — _"Make this warmer," "Make it more formal," "Shorten thi
 generated email rewritten in place.
 
 - Powered by the **OpenAI API** (Responses API, reasoning effort `high`).
-- The request runs entirely server-side via `POST /api/payment-email/refine`; the
-  API key is read from `OPENAI_API_KEY` on the server and **never** reaches the browser.
+- The request runs entirely server-side via `POST /api/email/refine` (with
+  `emailType: "payment"`); the API key is read from `OPENAI_API_KEY` on the server
+  and **never** reaches the browser.
 - The model is `OPENAI_MODEL` (default `gpt-5.5`). Change it if that model isn't
   available on your account — no code change required.
 - The model is instructed to preserve the factual payment details and to return the
   email text only. Revisions stay client-side; the generated email box remains fully
   editable and copyable. **This feature edits email text only — it never sends email.**
+
+### Author Agreement Email
+
+- Select an author from the Client Library, or type a name for an author who isn't
+  saved yet — the greeting uses that name.
+- The **Agent** field auto-fills from the selected author's head agent and stays
+  editable; it signs the email. The **Agency** field is entered manually and appears
+  in the body. All three fields are required before generating.
+- "Generate Email" produces a copy-pasteable email inviting the author to review and
+  sign the agency agreement.
+- An **Edit Email** revision panel appears once the email is generated — it shares the
+  same OpenAI setup as Payment Email. It uses the same `OPENAI_API_KEY` and
+  `OPENAI_MODEL`, runs server-side via `POST /api/email/refine` (with
+  `emailType: "author_agreement"`), and **only generates copy-pasteable email text —
+  it does not send email.**
 
 ## Known Limitations
 
@@ -63,8 +79,8 @@ generated email rewritten in place.
 Author
   id, firstName, lastName, title, genre, email, headAgent, headAgentEmail,
   assignedAssistant  (all required)
-  proposalSentToEditors, authorMeetings, bidSent, dealMemoSent, dealMemoAccepted,
-  paymentReceived, paymentSentToAuthor  (all String, default "not_started")
+  authorOnboarded, proposalSentToEditors, authorMeetings, bidSent, dealMemoSent,
+  dealMemoAccepted, paymentReceived, paymentSentToAuthor  (all String, default "not_started")
   createdAt, updatedAt
 
 EditorOutreach
@@ -128,6 +144,8 @@ Open [http://localhost:3000](http://localhost:3000).
 
 **Required fields + Title/Genre** (migration `20260524000002_required_title_genre`): Adds required `title` and `genre` to `Author`, and makes the remaining `Author` text fields (`email`, `headAgent`, `headAgentEmail`, `assignedAssistant`) and `EditorOutreach` (`editorEmail`, `publishingHouse`) `NOT NULL`. Existing `NULL`s are backfilled to empty strings before the constraints apply, so the migration is safe on a populated database.
 
+**Author Onboarded stage** (migration `20260528000000_author_onboarded_stage`): Adds the new `Author.authorOnboarded` column as the first author-level stage. The column is `NOT NULL` with a default of `'not_started'`, so existing authors are preserved and automatically backfilled.
+
 ## Scripts
 
 | Script | What it does |
@@ -151,13 +169,14 @@ prisma/
     20260524000000_init/       Initial schema
     20260524000001_client_library/  Author model rebuild + EditorOutreach
     20260524000002_required_title_genre/  Title/Genre + required fields
+    20260528000000_author_onboarded_stage/  Adds Author.authorOnboarded (first author stage)
 
 src/
   app/
     actions.ts               Server actions (CRUD authors + editors, stage updates)
     api/
-      payment-email/
-        refine/route.ts      POST: revise a generated payment email via OpenAI
+      email/
+        refine/route.ts      POST: revise a generated email via OpenAI (emailType-aware)
     layout.tsx               Fonts + global shell
     globals.css              Editorial theme tokens + utilities
     page.tsx                 Root: initial data fetch → AppShell
@@ -178,7 +197,11 @@ src/
     FileUploadControl.tsx    Disabled upload control (placeholder)
 
     PaymentEmailCard.tsx     Payment email generator
-    AuthorPicker.tsx         Custom author listbox
+    AuthorAgreementEmail.tsx Author agreement email generator
+    AuthorPicker.tsx         Custom author listbox (select-only)
+    AuthorSelector.tsx       Author combobox (select a saved author or type a name)
+    EmailOutputBox.tsx       Shared copyable email output window
+    EmailRevisionPanel.tsx   Shared LLM "Edit Email" revision panel
     Field.tsx                Animated input + select primitives
     PlatoMark.tsx            Decorative ornament + hairline rule
 
@@ -187,7 +210,8 @@ src/
     authors.ts               Author Prisma queries
     editorOutreach.ts        EditorOutreach Prisma queries
     db.ts                    Lazy Prisma client (Neon HTTP adapter)
-    format.ts                USD formatting + payment email template
+    format.ts                USD formatting + payment/agreement email templates
+    refineEmailClient.ts     Client helper for POST /api/email/refine
     openai/
-      refinePaymentEmail.ts  Server-side OpenAI Responses call for email revision
+      refineEmail.ts         Server-side OpenAI Responses call (emailType-aware)
 ```
