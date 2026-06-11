@@ -451,17 +451,19 @@ export function paymentStageCssColor(
   return authorStageCssColor(status, locked);
 }
 
-// ─── Cross-chain completion cascade ───────────────────────────────────────────
+// ─── Cross-chain stage sync ───────────────────────────────────────────────────
 //
 // Two stages from each chain are "linked":
 //   author.paymentReceived       ↔ payment.paymentReceivedFromEditorStage
 //   author.paymentSentToAuthor   ↔ payment.paymentSentToAuthorStage
 //
-// When any linked stage is set to Completed, the chains' prefixes on BOTH
-// sides become Completed. The helpers below compute the full closure for a
-// single source change without scattering rules through the UI. Updates are
-// upgrade-only: stages already at "completed" are not touched, and non-
-// completed source values never propagate.
+// Linked stages mirror each other for ANY value — Not Started, In Progress,
+// or Completed. Setting one of them propagates the same value to its twin so
+// the two chains never drift on the fields they share. The prior-stage
+// prefix cascade (set all priors on both chains to Completed) still only
+// fires when the source change is to Completed; downgrades don't auto-undo
+// other stages, since the existing lock cascade in the UI already handles
+// the read-only "this is now blocked" affordance.
 
 export type StageCascade = {
   author: Partial<Record<AuthorStageField, string>>;
@@ -498,8 +500,9 @@ function completeAuthorPrefix(
 
 /**
  * Closure of updates triggered by setting a payment stage. Always sets the
- * source value; when that value is "completed", cascades the payment prefix
- * (and, for linked stages, the matching author-stage prefix).
+ * source value; for the two linked stages, mirrors that value to the matching
+ * author stage. When the value is "completed", also cascades both chains'
+ * prefixes to Completed.
  */
 export function buildPaymentStageCascade(
   source: PaymentStageField,
@@ -511,6 +514,13 @@ export function buildPaymentStageCascade(
     [source]: targetValue,
   };
   const author: Partial<Record<AuthorStageField, string>> = {};
+
+  // Mirror to linked author stage for any value.
+  if (source === "paymentReceivedFromEditorStage") {
+    author.paymentReceived = targetValue;
+  } else if (source === "paymentSentToAuthorStage") {
+    author.paymentSentToAuthor = targetValue;
+  }
 
   if (targetValue === "completed") {
     completePaymentPrefix(source, currentPayment, payment);
@@ -525,11 +535,9 @@ export function buildPaymentStageCascade(
 
 /**
  * Closure of updates triggered by setting an author stage. Always sets the
- * source value; when that value is "completed", and the source is one of the
- * two linked payment stages, cascades the matching payment-stage prefix (and
- * the author-stage prefix up to the source, since the spec says "all prior
- * author stages required to reach Payment Sent to Author should become
- * Completed").
+ * source value; for the two linked stages, mirrors that value to the matching
+ * payment stage. When the value is "completed", also cascades both chains'
+ * prefixes to Completed.
  */
 export function buildAuthorStageCascade(
   source: AuthorStageField,
@@ -541,6 +549,13 @@ export function buildAuthorStageCascade(
     [source]: targetValue,
   };
   const payment: Partial<Record<PaymentStageField, string>> = {};
+
+  // Mirror to linked payment stage for any value.
+  if (source === "paymentReceived") {
+    payment.paymentReceivedFromEditorStage = targetValue;
+  } else if (source === "paymentSentToAuthor") {
+    payment.paymentSentToAuthorStage = targetValue;
+  }
 
   if (targetValue === "completed") {
     if (source === "paymentReceived" || source === "paymentSentToAuthor") {

@@ -166,35 +166,6 @@ async function readCurrentStages(
   };
 }
 
-function applyCascadeToPayment(
-  authorId: string,
-  cascade: StageCascade,
-) {
-  // Build an upsert for the payment row that sets only the keys in
-  // cascade.payment. On create, fill in defaults for the unset stages.
-  const updates = cascade.payment;
-  return prisma.authorPaymentDetails.upsert({
-    where: { authorId },
-    update: updates,
-    create: {
-      authorId,
-      ...STAGE_DEFAULTS,
-      ...updates,
-    },
-  });
-}
-
-function applyCascadeToAuthor(
-  authorId: string,
-  cascade: StageCascade,
-) {
-  if (Object.keys(cascade.author).length === 0) return null;
-  return prisma.author.update({
-    where: { id: authorId },
-    data: cascade.author,
-  });
-}
-
 export type StageUpdateResult = {
   paymentDetails: AuthorPaymentDetailsRecord;
   authorStages: AuthorStages;
@@ -211,33 +182,59 @@ const AUTHOR_STAGE_SELECT = {
   paymentSentToAuthor: true,
 } as const;
 
+// Apply a cascade by running the payment upsert (if any) and the author
+// update (if any) sequentially and using each write's return value as the
+// authoritative state. We deliberately don't wrap these in
+// `prisma.$transaction([...])` — that array form has been unreliable on the
+// Neon HTTP adapter when mixing an upsert with an update across two models,
+// which is exactly what the cross-chain cascade does for the linked stages.
+// Both writes are idempotent and the cascade is upgrade-only on priors, so
+// running them sequentially without a transaction wrapper is safe: if the
+// second write fails the worst case is a partial-but-consistent state the
+// next click can reconcile.
 async function applyCascade(
   authorId: string,
   cascade: StageCascade,
 ): Promise<StageUpdateResult> {
-  // Build the prisma operations for whichever side(s) of the cascade have
-  // updates. Both run in a single transaction so the chains can't desync if
-  // one half fails.
-  const ops: Array<ReturnType<typeof prisma.authorPaymentDetails.upsert>> = [];
+  let paymentRow: Awaited<
+    ReturnType<typeof prisma.authorPaymentDetails.findUnique>
+  > | null = null;
+  let authorRow: AuthorStages | null = null;
+
   if (Object.keys(cascade.payment).length > 0) {
-    ops.push(applyCascadeToPayment(authorId, cascade));
+    paymentRow = await prisma.authorPaymentDetails.upsert({
+      where: { authorId },
+      update: cascade.payment,
+      create: {
+        authorId,
+        ...STAGE_DEFAULTS,
+        ...cascade.payment,
+      },
+    });
   }
-  const authorOp = applyCascadeToAuthor(authorId, cascade);
-  if (authorOp) {
-    // Cast: $transaction accepts a heterogeneous array of PrismaPromise.
-    ops.push(authorOp as unknown as ReturnType<typeof prisma.authorPaymentDetails.upsert>);
+  if (Object.keys(cascade.author).length > 0) {
+    authorRow = await prisma.author.update({
+      where: { id: authorId },
+      data: cascade.author,
+      select: AUTHOR_STAGE_SELECT,
+    });
   }
-  if (ops.length > 0) {
-    await prisma.$transaction(ops);
-  }
-  const [authorRow, paymentRow] = await Promise.all([
-    prisma.author.findUnique({
+
+  // Fill in whichever side we didn't write, so the caller gets the full
+  // merged state regardless of which half of the cascade had updates.
+  if (!authorRow) {
+    authorRow = await prisma.author.findUnique({
       where: { id: authorId },
       select: AUTHOR_STAGE_SELECT,
-    }),
-    prisma.authorPaymentDetails.findUnique({ where: { authorId } }),
-  ]);
-  if (!authorRow) throw new Error("Author not found.");
+    });
+    if (!authorRow) throw new Error("Author not found.");
+  }
+  if (!paymentRow) {
+    paymentRow = await prisma.authorPaymentDetails.findUnique({
+      where: { authorId },
+    });
+  }
+
   return {
     paymentDetails: paymentRow
       ? serializePaymentDetails(paymentRow)
