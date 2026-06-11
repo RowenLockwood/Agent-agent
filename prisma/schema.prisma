@@ -102,3 +102,100 @@ model AuthorPaymentDetails {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
+
+// ─── Payment Email templates ──────────────────────────────────────────────────
+
+// A saved Payment Email template. The body is stored as a tokenized JSON
+// segment list ({"t":"text","v":…} | {"t":"field","k":…}) so field references
+// survive label changes and render through one safe plain-text path; a
+// plain-text fallback (tokens shown as "[Label]") is stored alongside for
+// resilience. The Plato system default lives at a fixed id and is protected
+// from edits and deletion; user versions point back through parentTemplateId.
+model PaymentEmailTemplate {
+  id          String  @id @default(cuid())
+  name        String
+  description String  @default("")
+  subjectLine String?
+
+  tokenizedBody         String
+  plainTextBodyFallback String
+
+  isSystemDefault Boolean @default(false)
+  isAgencyDefault Boolean @default(false)
+  isActive        Boolean @default(true)
+
+  versionNumber    Int     @default(1)
+  parentTemplateId String?
+  parentTemplate   PaymentEmailTemplate?  @relation("PaymentEmailTemplateVersions", fields: [parentTemplateId], references: [id], onDelete: SetNull)
+  childVersions    PaymentEmailTemplate[] @relation("PaymentEmailTemplateVersions")
+
+  customFields     PaymentEmailCustomField[]
+  calculatedFields PaymentEmailCalculatedField[]
+  summaryFields    PaymentEmailSummaryField[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([parentTemplateId])
+  @@index([createdAt])
+}
+
+// Agency-created input field scoped to one template. fieldType:
+// "short_text" | "long_text" | "dropdown" | "number" | "currency" | "percentage".
+// dropdownOptions holds a JSON string array when fieldType = "dropdown".
+model PaymentEmailCustomField {
+  id         String               @id @default(cuid())
+  templateId String
+  template   PaymentEmailTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  fieldKey        String
+  label           String
+  fieldType       String
+  isRequired      Boolean @default(false)
+  placeholder     String?
+  defaultValue    String?
+  dropdownOptions String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([templateId, fieldKey])
+}
+
+// Agency-defined calculated field scoped to one template. expressionTree is a
+// validated structured JSON expression (field refs + add/subtract/multiply/
+// divide/percent-of nodes) — never executable code. outputType:
+// "number" | "currency" | "percentage". Summary-row membership lives solely in
+// PaymentEmailSummaryField; no summary flags are duplicated here.
+model PaymentEmailCalculatedField {
+  id         String               @id @default(cuid())
+  templateId String
+  template   PaymentEmailTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  fieldKey       String
+  label          String
+  outputType     String
+  expressionTree String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([templateId, fieldKey])
+}
+
+// Single source of truth for a template's summary row (the strip above
+// "Generate Email"). Up to four entries per template, ordered by displayOrder.
+model PaymentEmailSummaryField {
+  id         String               @id @default(cuid())
+  templateId String
+  template   PaymentEmailTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  fieldKey     String
+  summaryLabel String
+  displayOrder Int
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([templateId, fieldKey])
+}

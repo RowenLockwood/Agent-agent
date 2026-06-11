@@ -131,7 +131,7 @@ export function AppShell({
                 transition={{ duration: 0.25, ease: [0.2, 0.6, 0.2, 1] }}
                 className="h-full overflow-auto"
               >
-                <PaymentEmailWrapper authors={authors} />
+                <PaymentEmailWrapper authors={authors} agencyName={agencyName} />
               </motion.div>
             ) : (
               <motion.div
@@ -157,11 +157,17 @@ export function AppShell({
 }
 
 // Wrapper so PaymentEmailCard has its own selection state per session
-function PaymentEmailWrapper({ authors }: { authors: AuthorRecord[] }) {
+function PaymentEmailWrapper({
+  authors,
+  agencyName,
+}: {
+  authors: AuthorRecord[];
+  agencyName: string;
+}) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   return (
-    <div className="px-6 sm:px-10 lg:px-14 py-10 max-w-[860px]">
+    <div className="px-6 sm:px-10 lg:px-14 py-10 max-w-[960px]">
       <header className="mb-10">
         <h1
           className="font-serif text-[2rem] sm:text-[2.5rem] leading-none"
@@ -188,6 +194,7 @@ function PaymentEmailWrapper({ authors }: { authors: AuthorRecord[] }) {
         authors={authors}
         selectedId={selectedId}
         onSelect={setSelectedId}
+        agencyName={agencyName}
       />
     </div>
   );
