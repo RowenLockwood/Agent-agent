@@ -16,16 +16,30 @@ import { Field } from "./Field";
 type Props = {
   authors: AuthorRecord[];
   authorsError?: string | null;
+  /** Saved agency name; used as the default in the Agency field. */
+  defaultAgencyName?: string;
 };
 
 const REVISION_PLACEHOLDER =
   "Try: “Make this warmer,” “Make it more formal,” “Shorten this,” or “Add that the agreement is our standard terms.”";
 
-export function AuthorAgreementEmail({ authors, authorsError }: Props) {
+export function AuthorAgreementEmail({
+  authors,
+  authorsError,
+  defaultAgencyName = "",
+}: Props) {
   const [authorName, setAuthorName] = useState("");
   const [selectedAuthorId, setSelectedAuthorId] = useState<string | null>(null);
-  const [agency, setAgency] = useState("");
+  const [agency, setAgency] = useState(defaultAgencyName);
+  // Don't let a later prop change clobber what the user typed by hand. Once
+  // they edit the field, we leave it alone for the rest of the session; on
+  // unmount/remount (tab switch) the latest saved value is picked up afresh.
+  const [agencyEdited, setAgencyEdited] = useState(false);
   const [agentName, setAgentName] = useState("");
+
+  useEffect(() => {
+    if (!agencyEdited) setAgency(defaultAgencyName);
+  }, [defaultAgencyName, agencyEdited]);
 
   const [email, setEmail] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -165,9 +179,11 @@ export function AuthorAgreementEmail({ authors, authorsError }: Props) {
           hint="Appears in the body of the agreement email."
           autoComplete="off"
           placeholder="The agency's name"
+          highlightOnChange
           value={agency}
           onChange={(e) => {
             setAgency(e.currentTarget.value);
+            setAgencyEdited(true);
             resetOutput();
           }}
           required

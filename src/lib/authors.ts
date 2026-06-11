@@ -1,5 +1,9 @@
+import {
+  defaultPaymentDetailsFor,
+  serializePaymentDetails,
+  type AuthorPaymentDetailsRecord,
+} from "./paymentDetails";
 import { prisma } from "./db";
-import type { AuthorStageField } from "./stages";
 
 export type AuthorRecord = {
   id: string;
@@ -19,6 +23,7 @@ export type AuthorRecord = {
   dealMemoAccepted: string;
   paymentReceived: string;
   paymentSentToAuthor: string;
+  paymentDetails: AuthorPaymentDetailsRecord;
   createdAt: string;
   updatedAt: string;
 };
@@ -56,39 +61,55 @@ type AuthorRow = {
   updatedAt: Date;
 };
 
-function serialize(a: AuthorRow): AuthorRecord {
-  return { ...a, createdAt: a.createdAt.toISOString(), updatedAt: a.updatedAt.toISOString() };
+// Prisma's findMany with `include: { paymentDetails: true }` returns the
+// relation as a possibly-null row. We default it client-side so the rest of
+// the app can assume every AuthorRecord has a paymentDetails object.
+type AuthorPaymentRow = Parameters<typeof serializePaymentDetails>[0];
+
+function serialize(
+  a: AuthorRow,
+  paymentDetails: AuthorPaymentRow | null,
+): AuthorRecord {
+  return {
+    ...a,
+    paymentDetails: paymentDetails
+      ? serializePaymentDetails(paymentDetails)
+      : defaultPaymentDetailsFor(a.id),
+    createdAt: a.createdAt.toISOString(),
+    updatedAt: a.updatedAt.toISOString(),
+  };
 }
 
 export async function listAuthors(): Promise<AuthorRecord[]> {
-  const rows = await prisma.author.findMany({ orderBy: { createdAt: "desc" } });
-  return rows.map(serialize);
+  const rows = await prisma.author.findMany({
+    orderBy: { createdAt: "desc" },
+    include: { paymentDetails: true },
+  });
+  return rows.map((r) => serialize(r, r.paymentDetails));
 }
 
 export async function createAuthor(input: AuthorDetails): Promise<AuthorRecord> {
-  const row = await prisma.author.create({ data: input });
-  return serialize(row);
+  // Author + its payment details row are created together so the dropdown
+  // is consistent from day one for new authors.
+  const row = await prisma.author.create({
+    data: { ...input, paymentDetails: { create: {} } },
+    include: { paymentDetails: true },
+  });
+  return serialize(row, row.paymentDetails);
 }
 
 export async function updateAuthor(
   id: string,
   input: AuthorDetails,
 ): Promise<AuthorRecord> {
-  const row = await prisma.author.update({ where: { id }, data: input });
-  return serialize(row);
+  const row = await prisma.author.update({
+    where: { id },
+    data: input,
+    include: { paymentDetails: true },
+  });
+  return serialize(row, row.paymentDetails);
 }
 
 export async function deleteAuthor(id: string): Promise<void> {
   await prisma.author.delete({ where: { id } });
-}
-
-export async function updateAuthorStage(
-  authorId: string,
-  field: AuthorStageField,
-  value: string,
-): Promise<void> {
-  await prisma.author.update({
-    where: { id: authorId },
-    data: { [field]: value },
-  });
 }

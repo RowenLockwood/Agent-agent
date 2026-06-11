@@ -4,11 +4,14 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useState } from "react";
 import type { AuthorRecord } from "@/lib/authors";
 import { AddAuthorModal } from "./AddAuthorModal";
+import { AgencyNameInput } from "./AgencyNameInput";
 import { AuthorTableRow } from "./AuthorTableRow";
 
 type Props = {
   authors: AuthorRecord[];
   authorsError: string | null;
+  agencyName: string;
+  onAgencyNameSaved: (value: string) => void;
   onAdded: (a: AuthorRecord) => void;
   onUpdated: (a: AuthorRecord) => void;
   onDeleted: (id: string) => void;
@@ -17,6 +20,8 @@ type Props = {
 export function ClientLibrary({
   authors,
   authorsError,
+  agencyName,
+  onAgencyNameSaved,
   onAdded,
   onUpdated,
   onDeleted,
@@ -45,13 +50,19 @@ export function ClientLibrary({
         style={{ borderColor: "var(--color-rule-soft)" }}
       >
         <div className="flex flex-wrap items-start gap-y-5 gap-x-8 justify-between">
-          <div>
-            <h1
-              className="font-serif text-[2rem] sm:text-[2.5rem] leading-none"
-              style={{ color: "var(--color-ink)" }}
-            >
-              Client Library
-            </h1>
+          <div className="flex-1 min-w-0">
+            <div className="flex flex-wrap items-baseline gap-x-2 sm:gap-x-2.5 gap-y-2 pr-2">
+              <h1
+                className="font-serif text-[2rem] sm:text-[2.5rem] leading-none whitespace-nowrap"
+                style={{ color: "var(--color-ink)" }}
+              >
+                Client Library:
+              </h1>
+              <AgencyNameInput
+                initialValue={agencyName}
+                onSaved={onAgencyNameSaved}
+              />
+            </div>
             <p
               className="mt-2 font-sans text-[0.9rem]"
               style={{ color: "var(--color-ink-muted)" }}

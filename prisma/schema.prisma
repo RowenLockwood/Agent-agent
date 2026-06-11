@@ -35,6 +35,7 @@ model Author {
   updatedAt             DateTime @updatedAt
 
   editorOutreach        EditorOutreach[]
+  paymentDetails        AuthorPaymentDetails?
 
   @@index([createdAt])
 }
@@ -61,4 +62,43 @@ model EditorOutreach {
   updatedAt DateTime @updatedAt
 
   @@index([authorId])
+}
+
+// Single-row settings table; the only row uses id = "singleton".
+model AppSettings {
+  id         String   @id
+  agencyName String   @default("")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+// One row per author. Houses the contract/payment progression plus the
+// commission & royalty terms shown in the Client Library's Payment Details
+// dropdown. The stage values share the author-level vocabulary
+// ("not_started" | "in_progress" | "completed"), and the dollar/percent/date
+// fields stay null until Contract Details unlocks.
+model AuthorPaymentDetails {
+  id       String @id @default(cuid())
+  authorId String @unique
+  author   Author @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  contractSentToEditorStage       String @default("not_started")
+  backAndForthWithEditorStage     String @default("not_started")
+  contractSignedByAuthorStage     String @default("not_started")
+  contractSignedByEditorStage     String @default("not_started")
+  contractSignedByAllPartiesStage String @default("not_started")
+  paymentReceivedFromEditorStage  String @default("not_started")
+  paymentSentToAuthorStage        String @default("not_started")
+
+  commissionAmount           Float?
+  commissionPercentForAgency Float?
+
+  firstRoyaltyStatementDate DateTime?
+  renewalIntervalNumber     Int?
+  renewalIntervalUnit       String? // "weeks" | "months"
+  lastSentToAuthorDate      DateTime?
+  nextSendToAuthorDate      DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
