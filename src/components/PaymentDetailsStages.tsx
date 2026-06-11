@@ -61,8 +61,8 @@ export function PaymentDetailsStages({ stages, onUpdate }: Props) {
             }}
           >
             <span
-              className="smallcaps flex items-center gap-1 text-[0.58rem] leading-tight"
-              style={{ color: "var(--color-ink-muted)" }}
+              className="smallcaps flex items-start gap-1 text-[0.68rem] leading-[1.18]"
+              style={{ color: "var(--color-ink-soft)", letterSpacing: "0.03em" }}
             >
               {locked && (
                 <svg
@@ -70,6 +70,7 @@ export function PaymentDetailsStages({ stages, onUpdate }: Props) {
                   height="8"
                   viewBox="0 0 10 10"
                   aria-hidden="true"
+                  className="mt-[0.15rem] flex-shrink-0"
                 >
                   <path
                     d="M2.5 4.5V3a2.5 2.5 0 015 0v1.5"
@@ -89,9 +90,9 @@ export function PaymentDetailsStages({ stages, onUpdate }: Props) {
               )}
               {label}
             </span>
-            <span className="mt-1 flex items-center gap-1">
+            <span className="mt-1.5 flex items-center gap-1">
               <span
-                className="font-sans text-[0.8rem] font-medium leading-tight"
+                className="font-sans text-[0.85rem] font-medium leading-tight"
                 style={{ color: locked ? "var(--color-ink-muted)" : color }}
               >
                 {locked ? "Locked" : AUTHOR_STAGE_STATUS_LABELS[status]}

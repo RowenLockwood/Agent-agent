@@ -167,7 +167,7 @@ export function AuthorTableRow({ author, onEdit, onDeleted }: Props) {
         <div className="flex flex-wrap items-start justify-between gap-y-3 gap-x-6">
           <div className="flex-1 min-w-0">
             <h3
-              className="font-serif text-[1.35rem] leading-tight"
+              className="font-serif text-[1.25rem] leading-tight"
               style={{ color: "var(--color-ink)" }}
             >
               {author.firstName} {author.lastName}
@@ -220,10 +220,10 @@ export function AuthorTableRow({ author, onEdit, onDeleted }: Props) {
         </div>
 
         {/* Stages */}
-        <div className="mt-4">
+        <div className="mt-5">
           <div
-            className="smallcaps text-[0.65rem] mb-2"
-            style={{ color: "var(--color-ink-muted)" }}
+            className="smallcaps text-[0.82rem] mb-2.5"
+            style={{ color: "var(--color-ink-soft)" }}
           >
             Stages
           </div>
@@ -239,8 +239,8 @@ export function AuthorTableRow({ author, onEdit, onDeleted }: Props) {
           <button
             type="button"
             onClick={handleExpand}
-            className="inline-flex items-center gap-1.5 text-[0.78rem] font-sans transition-colors focus:outline-none focus-visible:underline"
-            style={{ color: "var(--color-ink-muted)" }}
+            className="inline-flex items-center gap-1.5 text-[0.92rem] font-sans font-medium transition-colors focus:outline-none focus-visible:underline"
+            style={{ color: "var(--color-ink-soft)" }}
             aria-expanded={expanded}
           >
             <motion.span

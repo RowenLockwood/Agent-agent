@@ -67,8 +67,8 @@ export function ContractDetailsBox({
     >
       <header className="flex items-center justify-between mb-3">
         <h3
-          className="smallcaps text-[0.74rem]"
-          style={{ color: "var(--color-ink-muted)" }}
+          className="smallcaps text-[0.84rem]"
+          style={{ color: "var(--color-ink-soft)" }}
         >
           Contract Details
         </h3>

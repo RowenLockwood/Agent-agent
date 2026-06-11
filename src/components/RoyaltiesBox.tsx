@@ -115,16 +115,52 @@ export function RoyaltiesBox({
         background: "var(--color-paper)",
       }}
     >
-      <header className="mb-2">
+      <header className="mb-3">
         <h4
-          className="smallcaps text-[0.72rem]"
-          style={{ color: "var(--color-ink-muted)" }}
+          className="smallcaps text-[0.8rem]"
+          style={{ color: "var(--color-ink-soft)" }}
         >
           Royalties
         </h4>
       </header>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-1">
+      {/* At-a-glance schedule — surfaced above the editable source fields so the
+          royalty cadence and send dates read first. Distinct parchment panel,
+          but cohesive with the box rather than a separate component. */}
+      <div
+        className="rounded-[3px] px-4 py-3.5 grid grid-cols-1 sm:grid-cols-3 gap-x-5 gap-y-3.5"
+        style={{
+          background: "var(--color-paper-soft)",
+          border: "1px solid var(--color-rule-soft)",
+        }}
+      >
+        <ReadOnlyRow
+          label="Renewal Cadence"
+          value={renewalSummary ?? "—"}
+          valueColor="var(--color-ink-soft)"
+        />
+        <ReadOnlyRow
+          label="Next Send to Author"
+          value={
+            displayedNext ? formatDisplayDate(displayedNext) : "Not yet scheduled"
+          }
+          valueColor={STATUS_COLORS[status]}
+          badge={NEXT_SEND_STATUS_LABELS[status]}
+          badgeColor={STATUS_COLORS[status]}
+        />
+        <ReadOnlyRow
+          label="Last Sent to Author"
+          value={
+            hasLastSent ? formatDisplayDate(lastSentToAuthorDate) : "Not yet sent"
+          }
+          valueColor={hasLastSent ? "#1a5c3a" : "var(--color-ink-muted)"}
+          badge={hasLastSent ? "Sent" : null}
+          badgeColor={hasLastSent ? "#1a5c3a" : undefined}
+        />
+      </div>
+
+      {/* Editable source fields */}
+      <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-1">
         <Field
           label="First Royalty Statement Date"
           hint="Used as the base date for the next-send schedule."
@@ -188,33 +224,6 @@ export function RoyaltiesBox({
           }
         />
       </div>
-
-      <div
-        className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-3 pt-3"
-        style={{ borderTop: "1px dashed var(--color-rule-soft)" }}
-      >
-        <ReadOnlyRow
-          label="Renewal Cadence"
-          value={renewalSummary ?? "—"}
-          valueColor="var(--color-ink-soft)"
-        />
-        <ReadOnlyRow
-          label="Last Sent to Author"
-          value={hasLastSent ? formatDisplayDate(lastSentToAuthorDate) : "Not yet sent"}
-          valueColor={
-            hasLastSent ? "#1a5c3a" : "var(--color-ink-muted)"
-          }
-          badge={hasLastSent ? "Sent" : null}
-          badgeColor={hasLastSent ? "#1a5c3a" : undefined}
-        />
-        <ReadOnlyRow
-          label="Next Send to Author"
-          value={displayedNext ? formatDisplayDate(displayedNext) : "Add a first statement date and renewal interval"}
-          valueColor={STATUS_COLORS[status]}
-          badge={NEXT_SEND_STATUS_LABELS[status]}
-          badgeColor={STATUS_COLORS[status]}
-        />
-      </div>
     </section>
   );
 }
@@ -235,14 +244,14 @@ function ReadOnlyRow({
   return (
     <div>
       <div
-        className="smallcaps text-[0.68rem] mb-0.5"
-        style={{ color: "var(--color-ink-muted)" }}
+        className="smallcaps text-[0.74rem] mb-1"
+        style={{ color: "var(--color-ink-soft)" }}
       >
         {label}
       </div>
       <div className="flex items-center gap-2 flex-wrap">
         <span
-          className="font-serif italic text-[1rem] leading-tight"
+          className="font-serif italic text-[1.1rem] leading-tight"
           style={{ color: valueColor }}
         >
           {value}

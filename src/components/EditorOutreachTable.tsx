@@ -51,8 +51,8 @@ export function EditorOutreachTable({
     >
       <div className="flex items-center justify-between mb-3">
         <h3
-          className="smallcaps text-[0.72rem]"
-          style={{ color: "var(--color-ink-muted)" }}
+          className="smallcaps text-[0.82rem]"
+          style={{ color: "var(--color-ink-soft)" }}
         >
           Editors Reached Out To
           {editors.length > 0 && (

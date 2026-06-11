@@ -46,8 +46,8 @@ export function PaymentDetailsDropdown({
         <button
           type="button"
           onClick={() => setExpanded((v) => !v)}
-          className="inline-flex items-center gap-1.5 text-[0.78rem] font-sans transition-colors focus:outline-none focus-visible:underline"
-          style={{ color: "var(--color-ink-muted)" }}
+          className="inline-flex items-center gap-1.5 text-[0.92rem] font-sans font-medium transition-colors focus:outline-none focus-visible:underline"
+          style={{ color: "var(--color-ink-soft)" }}
           aria-expanded={expanded}
         >
           <motion.span
@@ -78,10 +78,10 @@ export function PaymentDetailsDropdown({
             >
               <section className="mb-4">
                 <h3
-                  className="smallcaps text-[0.72rem] mb-3"
-                  style={{ color: "var(--color-ink-muted)" }}
+                  className="smallcaps text-[0.82rem] mb-3"
+                  style={{ color: "var(--color-ink-soft)" }}
                 >
-                  Stages
+                  Payment Stages
                 </h3>
                 <PaymentDetailsStages
                   stages={paymentStages}
