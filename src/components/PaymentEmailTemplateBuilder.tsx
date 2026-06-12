@@ -2,7 +2,9 @@
 
 import { motion } from "framer-motion";
 import {
+  forwardRef,
   useEffect,
+  useImperativeHandle,
   useMemo,
   useRef,
   useState,
@@ -55,6 +57,8 @@ type Props = {
   mode: Mode;
   /** Source template for duplicate / version; null for "blank". */
   source: PaymentEmailTemplateRecord | null;
+  /** The Plato system default, available as a starting-point in "blank" mode. */
+  systemDefault: PaymentEmailTemplateRecord | null;
   onClose: () => void;
   onSaved: (saved: PaymentEmailTemplateRecord) => void;
 };
@@ -105,6 +109,7 @@ function draftFromTemplate(t: PaymentEmailTemplateRecord, mode: Mode): Draft {
 export function PaymentEmailTemplateBuilder({
   mode,
   source,
+  systemDefault,
   onClose,
   onSaved,
 }: Props) {
@@ -199,6 +204,7 @@ export function PaymentEmailTemplateBuilder({
         <div className="flex-1 min-h-0 overflow-auto">
           {step === "start" ? (
             <StartingPointStep
+              systemDefault={systemDefault}
               onCancel={onClose}
               onDraftReady={(d) => {
                 setDraft(d);
@@ -294,9 +300,11 @@ function BuilderHeader({
 // ─── Step 1: Starting point ─────────────────────────────────────────────────
 
 function StartingPointStep({
+  systemDefault,
   onCancel,
   onDraftReady,
 }: {
+  systemDefault: PaymentEmailTemplateRecord | null;
   onCancel: () => void;
   onDraftReady: (d: Draft) => void;
 }) {
@@ -305,9 +313,25 @@ function StartingPointStep({
   const [importing, setImporting] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
 
-  function startBlank() {
-    const d = emptyDraft();
+  /**
+   * "Start from Plato Default" preloads the seeded default's body, custom
+   * fields, calculations, and summary row so the user can revise the standard
+   * Payment Email without overwriting the protected original.
+   */
+  function startFromPlatoDefault() {
+    if (!systemDefault) {
+      setImportError("The Plato Default isn't loaded yet. Try again in a moment.");
+      return;
+    }
+    const d = draftFromTemplate(systemDefault, "duplicate");
+    // Override the duplicate suffix with something more inviting for first-time
+    // users who haven't named their variation yet.
+    d.name = "My Payment Email";
     onDraftReady(d);
+  }
+
+  function startBlank() {
+    onDraftReady(emptyDraft());
   }
 
   function startFromText(text: string, name = "Custom Payment Email") {
@@ -354,6 +378,12 @@ function StartingPointStep({
       <StartCard
         title="Start from Plato Default"
         description="Begin with Plato's standard payment confirmation and rework it."
+        onClick={startFromPlatoDefault}
+      />
+
+      <StartCard
+        title="Start Blank"
+        description="A fresh canvas — bring your own copy."
         onClick={startBlank}
       />
 
@@ -489,15 +519,20 @@ function BuilderEditor({
   draft: Draft;
   setDraft: (next: Draft) => void;
 }) {
+  const canvasHandle = useRef<CanvasHandle>(null);
   return (
     <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6 px-6 sm:px-10 py-8">
       <div className="flex flex-col gap-8 min-w-0">
-        <TemplateCanvas draft={draft} setDraft={setDraft} />
+        <TemplateCanvas ref={canvasHandle} draft={draft} setDraft={setDraft} />
         <CalculationsSection draft={draft} setDraft={setDraft} />
         <SummaryRowConfigurator draft={draft} setDraft={setDraft} />
         <TemplatePreview draft={draft} />
       </div>
-      <BuiltInFieldPalette draft={draft} setDraft={setDraft} />
+      <BuiltInFieldPalette
+        draft={draft}
+        setDraft={setDraft}
+        canvasHandle={canvasHandle}
+      />
     </div>
   );
 }
@@ -516,9 +551,11 @@ const PALETTE_GROUP_LABELS: Record<BuiltInField["paletteGroup"], string> = {
 function BuiltInFieldPalette({
   draft,
   setDraft,
+  canvasHandle,
 }: {
   draft: Draft;
   setDraft: (d: Draft) => void;
+  canvasHandle: React.RefObject<CanvasHandle | null>;
 }) {
   const [query, setQuery] = useState("");
   const [showCustomModal, setShowCustomModal] = useState(false);
@@ -596,7 +633,15 @@ function BuiltInFieldPalette({
                 <FieldChip
                   key={it.key}
                   label={it.label}
-                  onClick={() => insertSegment(draft, setDraft, { t: "field", k: it.key })}
+                  onClick={() => {
+                    // Prefer inserting at the caret/selection; fall back to
+                    // appending if the canvas hasn't mounted yet.
+                    if (canvasHandle.current) {
+                      canvasHandle.current.insertField(it.key);
+                    } else {
+                      insertSegment(draft, setDraft, { t: "field", k: it.key });
+                    }
+                  }}
                   draggable
                   data-fieldkey={it.key}
                 />
@@ -683,38 +728,244 @@ function insertSegment(draft: Draft, setDraft: (d: Draft) => void, seg: BodySegm
   setDraft({ ...draft, body });
 }
 
-function TemplateCanvas({
-  draft,
-  setDraft,
-}: {
+// Imperative handle the palette uses to insert a field at the user's current
+// selection (or at the end if focus has wandered).
+type CanvasHandle = {
+  insertField: (key: string) => void;
+};
+
+// HTML-escape a user-entered text segment before setting innerHTML.
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+const CHIP_INLINE_STYLE =
+  "display:inline-flex;align-items:center;gap:4px;padding:0 6px;margin:0 1px;" +
+  "border:1px solid var(--color-bronze);background:rgba(138,106,50,0.10);" +
+  "border-radius:2px;font-family:var(--font-sans);font-size:0.92em;" +
+  "line-height:1.4;vertical-align:baseline;color:var(--color-ink-soft);";
+
+function renderBodyToHtml(body: BodySegment[], draft: Draft): string {
+  if (body.length === 0) return "";
+  return body
+    .map((seg) => {
+      if (seg.t === "text") {
+        // Convert raw newlines into <br>s so the contentEditable browser
+        // engine renders multi-line bodies inline.
+        return escapeHtml(seg.v).replace(/\n/g, "<br>");
+      }
+      const label = labelForKey(seg.k, draft);
+      return (
+        `<span class="plato-chip" contenteditable="false" data-fkey="${escapeHtml(seg.k)}" style="${CHIP_INLINE_STYLE}">` +
+        escapeHtml(label) +
+        "</span>"
+      );
+    })
+    .join("");
+}
+
+function makeChipNode(key: string, label: string): HTMLSpanElement {
+  const span = document.createElement("span");
+  span.className = "plato-chip";
+  span.setAttribute("contenteditable", "false");
+  span.setAttribute("data-fkey", key);
+  span.textContent = label;
+  span.setAttribute("style", CHIP_INLINE_STYLE);
+  return span;
+}
+
+/**
+ * Walk the contentEditable DOM and reconstruct BodySegment[]. Browsers
+ * insert <br> on Enter (modern WebKit/Blink) and sometimes wrap in <div>
+ * or <p>; we treat each as a newline so the model stays consistent.
+ */
+function serializeCanvas(root: HTMLElement): BodySegment[] {
+  const segments: BodySegment[] = [];
+  let textBuf = "";
+  function flushText() {
+    if (textBuf) {
+      segments.push({ t: "text", v: textBuf });
+      textBuf = "";
+    }
+  }
+  function walk(node: Node) {
+    if (node.nodeType === Node.TEXT_NODE) {
+      textBuf += node.textContent ?? "";
+      return;
+    }
+    if (!(node instanceof HTMLElement)) return;
+    if (node.tagName === "BR") {
+      textBuf += "\n";
+      return;
+    }
+    if (node.classList.contains("plato-chip")) {
+      const key = node.getAttribute("data-fkey");
+      if (key) {
+        flushText();
+        segments.push({ t: "field", k: key });
+      }
+      return;
+    }
+    // <div>/<p> wrappers act as block boundaries.
+    if (node.tagName === "DIV" || node.tagName === "P") {
+      if (textBuf && !textBuf.endsWith("\n")) textBuf += "\n";
+      for (const child of Array.from(node.childNodes)) walk(child);
+      if (!textBuf.endsWith("\n")) textBuf += "\n";
+      return;
+    }
+    for (const child of Array.from(node.childNodes)) walk(child);
+  }
+  for (const child of Array.from(root.childNodes)) walk(child);
+  flushText();
+  return segments;
+}
+
+/**
+ * Insert a field chip at `range`. If the range covers any selected content
+ * (e.g. the user highlighted "[author name]" in their pasted text), that
+ * selection is REPLACED — that's the core UX the user asked for.
+ */
+function insertChipAtRange(root: HTMLElement, range: Range, chip: HTMLSpanElement): void {
+  if (!root.contains(range.startContainer)) {
+    // Drop landed outside the editable area — append at the end.
+    range = document.createRange();
+    range.selectNodeContents(root);
+    range.collapse(false);
+  }
+  range.deleteContents();
+  range.insertNode(chip);
+  // Caret after the chip.
+  const after = document.createRange();
+  after.setStartAfter(chip);
+  after.collapse(true);
+  const sel = window.getSelection();
+  sel?.removeAllRanges();
+  sel?.addRange(after);
+}
+
+const TemplateCanvas = forwardRef<CanvasHandle, {
   draft: Draft;
   setDraft: (d: Draft) => void;
-}) {
-  function updateText(index: number, value: string) {
-    const next = draft.body.slice();
-    const seg = next[index];
-    if (!seg || seg.t !== "text") return;
-    next[index] = { t: "text", v: value };
-    setDraft({ ...draft, body: next });
+}>(function TemplateCanvas({ draft, setDraft }, ref) {
+  const editorRef = useRef<HTMLDivElement>(null);
+  // The DOM is the source of truth while the user is typing. We track what
+  // body shape we last rendered, and only re-paint the DOM when the body
+  // changes from OUTSIDE this component (initial mount, "Start from Plato
+  // Default" preload, programmatic chip insert).
+  const lastRenderedBodyRef = useRef<string>("");
+
+  useEffect(() => {
+    if (!editorRef.current) return;
+    const json = JSON.stringify(draft.body);
+    if (json === lastRenderedBodyRef.current) return;
+    editorRef.current.innerHTML = renderBodyToHtml(draft.body, draft);
+    lastRenderedBodyRef.current = json;
+  }, [draft.body, draft.customFields, draft.calculatedFields, draft]);
+
+  function commitFromDOM() {
+    if (!editorRef.current) return;
+    const segments = serializeCanvas(editorRef.current);
+    const json = JSON.stringify(segments);
+    if (json === lastRenderedBodyRef.current) return;
+    lastRenderedBodyRef.current = json;
+    setDraft({ ...draft, body: segments });
   }
 
-  function removeSegment(index: number) {
-    const next = draft.body.slice();
-    next.splice(index, 1);
-    setDraft({ ...draft, body: next });
+  function insertChipAt(
+    range: Range | null,
+    key: string,
+  ): void {
+    const root = editorRef.current;
+    if (!root) return;
+    const r = range ?? endRange(root);
+    const chip = makeChipNode(key, labelForKey(key, draft));
+    insertChipAtRange(root, r, chip);
+    commitFromDOM();
   }
 
-  function insertAt(index: number, seg: BodySegment) {
-    const next = draft.body.slice();
-    next.splice(index, 0, seg);
-    setDraft({ ...draft, body: next });
+  function endRange(root: HTMLElement): Range {
+    const r = document.createRange();
+    r.selectNodeContents(root);
+    r.collapse(false);
+    return r;
   }
 
-  function onDrop(index: number, e: React.DragEvent) {
+  useImperativeHandle(ref, () => ({
+    insertField(key: string) {
+      const root = editorRef.current;
+      if (!root) return;
+      // Use the active selection if it's inside the canvas; otherwise append.
+      const sel = window.getSelection();
+      let range: Range | null = null;
+      if (sel && sel.rangeCount > 0 && root.contains(sel.anchorNode)) {
+        range = sel.getRangeAt(0).cloneRange();
+      }
+      // Refocus so subsequent typing lands in the right place.
+      root.focus();
+      insertChipAt(range, key);
+    },
+  }));
+
+  function onDrop(e: React.DragEvent<HTMLDivElement>) {
     e.preventDefault();
     const key = e.dataTransfer.getData("application/x-plato-field");
     if (!key) return;
-    insertAt(index, { t: "field", k: key });
+    const root = editorRef.current;
+    if (!root) return;
+    // Resolve the drop point to a range. caretRangeFromPoint is the WebKit /
+    // Blink API; caretPositionFromPoint is the standardized one Firefox
+    // implements. Either works here.
+    let range: Range | null = null;
+    const docCaretRangeFromPoint = (
+      document as unknown as {
+        caretRangeFromPoint?: (x: number, y: number) => Range | null;
+      }
+    ).caretRangeFromPoint;
+    const docCaretPositionFromPoint = (
+      document as unknown as {
+        caretPositionFromPoint?: (
+          x: number,
+          y: number,
+        ) => { offsetNode: Node; offset: number } | null;
+      }
+    ).caretPositionFromPoint;
+    if (typeof docCaretRangeFromPoint === "function") {
+      range = docCaretRangeFromPoint(e.clientX, e.clientY);
+    } else if (typeof docCaretPositionFromPoint === "function") {
+      const pos = docCaretPositionFromPoint(e.clientX, e.clientY);
+      if (pos) {
+        range = document.createRange();
+        range.setStart(pos.offsetNode, pos.offset);
+        range.collapse(true);
+      }
+    }
+    root.focus();
+    insertChipAt(range, key);
+  }
+
+  function onKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
+    // Backspace right after a chip should remove the chip. Browsers normally
+    // delete a single character (the chip's contenteditable=false makes that
+    // weird), so we handle it explicitly.
+    if (e.key !== "Backspace" && e.key !== "Delete") return;
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0 || !sel.isCollapsed) return;
+    const range = sel.getRangeAt(0);
+    const dir = e.key === "Backspace" ? -1 : 1;
+    const candidate =
+      dir === -1
+        ? findChipBefore(range)
+        : findChipAfter(range);
+    if (candidate) {
+      e.preventDefault();
+      candidate.remove();
+      commitFromDOM();
+    }
   }
 
   return (
@@ -724,132 +975,103 @@ function TemplateCanvas({
         className="mt-2 font-sans text-[0.88rem]"
         style={{ color: "var(--color-ink-muted)" }}
       >
-        Click a field in the palette to drop it where the cursor sits, or drag
-        it onto the body. Keyboard works too — every chip is a button.
+        Type your email body. Drag a field from the palette onto any spot in
+        the text — including over a placeholder like “[author name]” to
+        replace it — or click a field to drop it where your cursor sits.
       </p>
 
       <div
-        className="mt-4 min-h-[14rem] bg-paper border border-rule-soft px-5 py-4 font-serif text-[1.05rem] leading-[1.75] text-ink flex flex-wrap gap-y-1 items-baseline"
+        ref={editorRef}
+        contentEditable
+        suppressContentEditableWarning
+        spellCheck
+        onInput={commitFromDOM}
+        onBlur={commitFromDOM}
+        onKeyDown={onKeyDown}
         onDragOver={(e) => {
           if (e.dataTransfer.types.includes("application/x-plato-field")) {
             e.preventDefault();
             e.dataTransfer.dropEffect = "copy";
           }
         }}
-        onDrop={(e) => onDrop(draft.body.length, e)}
-      >
-        {draft.body.length === 0 && (
-          <p className="italic text-ink-muted/70">
-            Start typing your email body — Plato will let you insert fields anywhere.
-          </p>
-        )}
-        {draft.body.map((seg, i) => (
-          <CanvasSegment
-            key={i}
-            seg={seg}
-            draft={draft}
-            onTextChange={(v) => updateText(i, v)}
-            onRemove={() => removeSegment(i)}
-            onDrop={(e) => onDrop(i + 1, e)}
-          />
-        ))}
-        {/* Tailing "add a text run" affordance */}
-        <button
-          type="button"
-          onClick={() => insertAt(draft.body.length, { t: "text", v: "" })}
-          className="ml-2 text-[0.78rem] smallcaps text-ink-muted hover:text-ink transition-colors"
-        >
-          + Text
-        </button>
-      </div>
+        onDrop={onDrop}
+        data-plato-canvas="true"
+        className="plato-canvas mt-4 min-h-[14rem] bg-paper border border-rule-soft px-5 py-4 font-serif text-[1.05rem] leading-[1.75] text-ink whitespace-pre-wrap focus:outline-none focus:border-ink/60 transition-colors"
+        style={{ wordBreak: "break-word" }}
+      />
+      {/* Empty-state placeholder. We render this outside the editor so
+          contentEditable doesn't capture or pollute it. */}
+      <PlatoCanvasPlaceholder body={draft.body} />
     </section>
   );
-}
+});
 
-function TextRunSegment({
-  value,
-  onChange,
-  onDrop,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  onDrop: (e: React.DragEvent) => void;
-}) {
-  const ref = useRef<HTMLTextAreaElement>(null);
-  useEffect(() => {
-    if (!ref.current) return;
-    ref.current.style.height = "auto";
-    ref.current.style.height = `${ref.current.scrollHeight}px`;
-  }, [value]);
+function PlatoCanvasPlaceholder({ body }: { body: BodySegment[] }) {
+  const isEmpty =
+    body.length === 0 ||
+    (body.length === 1 && body[0].t === "text" && !body[0].v.trim());
+  if (!isEmpty) return null;
   return (
-    <textarea
-      ref={ref}
-      value={value}
-      onChange={(e) => onChange(e.currentTarget.value)}
-      rows={1}
-      onDragOver={(e) => {
-        if (e.dataTransfer.types.includes("application/x-plato-field")) {
-          e.preventDefault();
-        }
-      }}
-      onDrop={onDrop}
-      className="bg-transparent resize-none outline-none min-w-[3rem] whitespace-pre-wrap"
-      style={{ fontFamily: "inherit", color: "inherit", flex: "1 1 100%" }}
-    />
-  );
-}
-
-function CanvasSegment({
-  seg,
-  draft,
-  onTextChange,
-  onRemove,
-  onDrop,
-}: {
-  seg: BodySegment;
-  draft: Draft;
-  onTextChange: (v: string) => void;
-  onRemove: () => void;
-  onDrop: (e: React.DragEvent) => void;
-}) {
-  if (seg.t === "text") {
-    return (
-      <TextRunSegment
-        value={seg.v}
-        onChange={onTextChange}
-        onDrop={onDrop}
-      />
-    );
-  }
-  // field
-  const label = getBuiltInField(seg.k)?.label
-    ?? draft.customFields.find((c) => c.fieldKey === seg.k)?.label
-    ?? draft.calculatedFields.find((c) => c.fieldKey === seg.k)?.label
-    ?? seg.k;
-  return (
-    <span
-      className="inline-flex items-center gap-1 px-1.5 py-0.5 mx-0.5 rounded-[2px] border align-baseline"
-      style={{
-        borderColor: "var(--color-bronze)",
-        background: "rgba(138,106,50,0.10)",
-        fontFamily: "var(--font-sans)",
-        fontSize: "0.92rem",
-      }}
+    <p
+      aria-hidden="true"
+      className="mt-[-12rem] mb-[10.5rem] mx-5 italic text-ink-muted/70 pointer-events-none"
     >
-      <span aria-hidden="true" style={{ color: "var(--color-bronze)" }}>
-        ◆
-      </span>
-      {label}
-      <button
-        type="button"
-        onClick={onRemove}
-        aria-label={`Remove ${label}`}
-        className="ml-1 text-ink-muted hover:text-wine transition-colors"
-      >
-        ×
-      </button>
-    </span>
+      Start typing your email body — drag fields from the palette to insert them anywhere.
+    </p>
   );
+}
+
+function findChipBefore(range: Range): HTMLElement | null {
+  let node: Node | null = range.startContainer;
+  let offset = range.startOffset;
+  if (node.nodeType === Node.TEXT_NODE && offset > 0) return null;
+  // Walk to the previous sibling chip if we're at the start of a text node
+  // or container.
+  while (node && node.parentNode) {
+    const prev: Node | null =
+      node.nodeType === Node.TEXT_NODE && offset === 0
+        ? node.previousSibling
+        : node.childNodes[offset - 1] ?? node.previousSibling;
+    if (!prev) {
+      node = node.parentNode;
+      offset = 0;
+      continue;
+    }
+    if (
+      prev.nodeType === Node.ELEMENT_NODE &&
+      (prev as HTMLElement).classList?.contains("plato-chip")
+    ) {
+      return prev as HTMLElement;
+    }
+    return null;
+  }
+  return null;
+}
+
+function findChipAfter(range: Range): HTMLElement | null {
+  let node: Node | null = range.startContainer;
+  const offset = range.startOffset;
+  if (node.nodeType === Node.TEXT_NODE) {
+    if (offset < (node.textContent?.length ?? 0)) return null;
+    const next = node.nextSibling;
+    if (
+      next?.nodeType === Node.ELEMENT_NODE &&
+      (next as HTMLElement).classList?.contains("plato-chip")
+    ) {
+      return next as HTMLElement;
+    }
+    return null;
+  }
+  if (node.nodeType === Node.ELEMENT_NODE) {
+    const next = (node as HTMLElement).childNodes[offset];
+    if (
+      next?.nodeType === Node.ELEMENT_NODE &&
+      (next as HTMLElement).classList?.contains("plato-chip")
+    ) {
+      return next as HTMLElement;
+    }
+  }
+  return null;
 }
 
 // ─── Custom field modal ────────────────────────────────────────────────────

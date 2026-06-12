@@ -131,6 +131,16 @@ export type TemplateListResult =
     }
   | { ok: false; error: string };
 
+// Surface the underlying error message — Prisma errors describe the schema
+// or query shape, not secrets, and a real message is much more actionable
+// than a generic "couldn't save". Stack traces are still logged server-side.
+function describeError(err: unknown, fallback: string): string {
+  if (err instanceof Error && err.message) {
+    return err.message.length > 400 ? `${err.message.slice(0, 400)}…` : err.message;
+  }
+  return fallback;
+}
+
 export async function listPaymentEmailTemplatesAction(): Promise<TemplateListResult> {
   try {
     const [templates, effectiveDefaultId] = await Promise.all([
@@ -140,7 +150,10 @@ export async function listPaymentEmailTemplatesAction(): Promise<TemplateListRes
     return { ok: true, templates, effectiveDefaultId };
   } catch (err) {
     console.error("listPaymentEmailTemplatesAction", err);
-    return { ok: false, error: "Couldn't load payment email templates." };
+    return {
+      ok: false,
+      error: describeError(err, "Couldn't load payment email templates."),
+    };
   }
 }
 
@@ -162,7 +175,10 @@ export async function createPaymentEmailTemplateAction(
     return { ok: true, template: tpl };
   } catch (err) {
     console.error("createPaymentEmailTemplateAction", err);
-    return { ok: false, error: "Couldn't save this template. Please try again." };
+    return {
+      ok: false,
+      error: describeError(err, "Couldn't save this template. Please try again."),
+    };
   }
 }
 
@@ -180,11 +196,11 @@ export async function updatePaymentEmailTemplateAction(
     const tpl = await updateTemplate(id, parsed.data as TemplateDraftInput);
     return { ok: true, template: tpl };
   } catch (err) {
-    if (err instanceof Error && err.message) {
-      return { ok: false, error: err.message };
-    }
     console.error("updatePaymentEmailTemplateAction", err);
-    return { ok: false, error: "Couldn't save the template." };
+    return {
+      ok: false,
+      error: describeError(err, "Couldn't save the template."),
+    };
   }
 }
 

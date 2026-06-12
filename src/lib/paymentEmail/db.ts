@@ -179,6 +179,9 @@ async function ensureSystemDefault(): Promise<TemplateRow> {
   });
   if (existing) return existing as unknown as TemplateRow;
 
+  // Sequential writes — Neon's HTTP adapter is unreliable with mixed-model
+  // nested creates in a single statement (same issue we hit on payment
+  // details). Seed the parent first, then the children explicitly.
   const seed = buildSystemDefaultRecord();
   await prisma.paymentEmailTemplate.create({
     data: {
@@ -192,23 +195,30 @@ async function ensureSystemDefault(): Promise<TemplateRow> {
       isAgencyDefault: false,
       isActive: true,
       versionNumber: 1,
-      calculatedFields: {
-        create: seed.calculatedFields.map((c) => ({
-          fieldKey: c.fieldKey,
-          label: c.label,
-          outputType: c.outputType,
-          expressionTree: serializeTreeForStorage(parseFormula(c.tokens)),
-        })),
-      },
-      summaryFields: {
-        create: seed.summaryFields.map((s, i) => ({
-          fieldKey: s.fieldKey,
-          summaryLabel: s.summaryLabel,
-          displayOrder: i,
-        })),
-      },
     },
   });
+
+  if (seed.calculatedFields.length > 0) {
+    await prisma.paymentEmailCalculatedField.createMany({
+      data: seed.calculatedFields.map((c) => ({
+        templateId: SYSTEM_DEFAULT_TEMPLATE_ID,
+        fieldKey: c.fieldKey,
+        label: c.label,
+        outputType: c.outputType,
+        expressionTree: serializeTreeForStorage(parseFormula(c.tokens)),
+      })),
+    });
+  }
+  if (seed.summaryFields.length > 0) {
+    await prisma.paymentEmailSummaryField.createMany({
+      data: seed.summaryFields.map((s, i) => ({
+        templateId: SYSTEM_DEFAULT_TEMPLATE_ID,
+        fieldKey: s.fieldKey,
+        summaryLabel: s.summaryLabel,
+        displayOrder: i,
+      })),
+    });
+  }
 
   const seeded = await prisma.paymentEmailTemplate.findUnique({
     where: { id: SYSTEM_DEFAULT_TEMPLATE_ID },
@@ -290,6 +300,8 @@ export async function createTemplate(
     });
     versionNumber = siblings + 2;
   }
+  // Same sequential pattern as the seed path — see ensureSystemDefault for
+  // why we don't use nested creates here.
   const created = await prisma.paymentEmailTemplate.create({
     data: {
       name: input.name,
@@ -306,37 +318,59 @@ export async function createTemplate(
       isActive: true,
       versionNumber,
       parentTemplateId: input.parentTemplateId ?? null,
-      customFields: {
-        create: input.customFields.map((cf) => ({
-          fieldKey: cf.fieldKey,
-          label: cf.label,
-          fieldType: cf.fieldType,
-          isRequired: cf.isRequired,
-          placeholder: cf.placeholder,
-          defaultValue: cf.defaultValue,
-          dropdownOptions:
-            cf.fieldType === "dropdown" ? JSON.stringify(cf.dropdownOptions) : null,
-        })),
-      },
-      calculatedFields: {
-        create: input.calculatedFields.map((c) => ({
-          fieldKey: c.fieldKey,
-          label: c.label,
-          outputType: c.outputType,
-          expressionTree: serializeTreeForStorage(parseFormula(c.tokens)),
-        })),
-      },
-      summaryFields: {
-        create: input.summaryFields.map((s, i) => ({
-          fieldKey: s.fieldKey,
-          summaryLabel: s.summaryLabel,
-          displayOrder: i,
-        })),
-      },
     },
+  });
+
+  await writeTemplateChildren(created.id, input);
+
+  const fresh = await prisma.paymentEmailTemplate.findUnique({
+    where: { id: created.id },
     include: TEMPLATE_INCLUDE,
   });
-  return rowToRecord(created as unknown as TemplateRow);
+  if (!fresh) throw new Error("Template vanished mid-create.");
+  return rowToRecord(fresh as unknown as TemplateRow);
+}
+
+async function writeTemplateChildren(
+  templateId: string,
+  input: TemplateDraftInput,
+): Promise<void> {
+  if (input.customFields.length > 0) {
+    await prisma.paymentEmailCustomField.createMany({
+      data: input.customFields.map((cf) => ({
+        templateId,
+        fieldKey: cf.fieldKey,
+        label: cf.label,
+        fieldType: cf.fieldType,
+        isRequired: cf.isRequired,
+        placeholder: cf.placeholder,
+        defaultValue: cf.defaultValue,
+        dropdownOptions:
+          cf.fieldType === "dropdown" ? JSON.stringify(cf.dropdownOptions) : null,
+      })),
+    });
+  }
+  if (input.calculatedFields.length > 0) {
+    await prisma.paymentEmailCalculatedField.createMany({
+      data: input.calculatedFields.map((c) => ({
+        templateId,
+        fieldKey: c.fieldKey,
+        label: c.label,
+        outputType: c.outputType,
+        expressionTree: serializeTreeForStorage(parseFormula(c.tokens)),
+      })),
+    });
+  }
+  if (input.summaryFields.length > 0) {
+    await prisma.paymentEmailSummaryField.createMany({
+      data: input.summaryFields.map((s, i) => ({
+        templateId,
+        fieldKey: s.fieldKey,
+        summaryLabel: s.summaryLabel,
+        displayOrder: i,
+      })),
+    });
+  }
 }
 
 /** Update an existing user-created template. Rejects the system default. */
@@ -373,46 +407,7 @@ export async function updateTemplate(
     },
   });
 
-  if (input.customFields.length > 0) {
-    await prisma.paymentEmailCustomField.createMany({
-      data: input.customFields.map((cf) => ({
-        templateId: id,
-        fieldKey: cf.fieldKey,
-        label: cf.label,
-        fieldType: cf.fieldType,
-        isRequired: cf.isRequired,
-        placeholder: cf.placeholder,
-        defaultValue: cf.defaultValue,
-        dropdownOptions:
-          cf.fieldType === "dropdown" ? JSON.stringify(cf.dropdownOptions) : null,
-      })),
-    });
-  }
-
-  if (input.calculatedFields.length > 0) {
-    for (const c of input.calculatedFields) {
-      await prisma.paymentEmailCalculatedField.create({
-        data: {
-          templateId: id,
-          fieldKey: c.fieldKey,
-          label: c.label,
-          outputType: c.outputType,
-          expressionTree: serializeTreeForStorage(parseFormula(c.tokens)),
-        },
-      });
-    }
-  }
-
-  if (input.summaryFields.length > 0) {
-    await prisma.paymentEmailSummaryField.createMany({
-      data: input.summaryFields.map((s, i) => ({
-        templateId: id,
-        fieldKey: s.fieldKey,
-        summaryLabel: s.summaryLabel,
-        displayOrder: i,
-      })),
-    });
-  }
+  await writeTemplateChildren(id, input);
 
   const fresh = await prisma.paymentEmailTemplate.findUnique({
     where: { id },

@@ -144,6 +144,9 @@ export function PaymentEmailCard({
           <PaymentEmailTemplateBuilder
             mode={builder.mode}
             source={builder.source}
+            systemDefault={
+              templates?.find((t) => t.id === SYSTEM_DEFAULT_TEMPLATE_ID) ?? null
+            }
             onClose={() => setBuilder({ open: false })}
             onSaved={async (saved) => {
               await refreshTemplates(saved.id);
