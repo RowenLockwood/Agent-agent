@@ -1,5 +1,5 @@
 import { prisma } from "./db";
-import type { EditorStageField } from "./stages";
+import { editorPaymentMirrorValue, type EditorStageField } from "./stages";
 
 export type EditorOutreachRecord = {
   id: string;
@@ -60,8 +60,30 @@ export async function createEditorOutreach(
   authorId: string,
   input: EditorDetails,
 ): Promise<EditorOutreachRecord> {
+  // New editors inherit the author's linked payment-stage state so the
+  // mirrored Payment Received / Payment Sent to Author values hold for every
+  // card from the moment it's created.
+  const author = await prisma.author.findUnique({
+    where: { id: authorId },
+    select: { paymentReceived: true, paymentSentToAuthor: true },
+  });
   const row = await prisma.editorOutreach.create({
-    data: { authorId, ...input },
+    data: {
+      authorId,
+      ...input,
+      ...(author
+        ? {
+            paymentReceivedStage: editorPaymentMirrorValue(
+              "paymentReceivedStage",
+              author.paymentReceived,
+            ),
+            paymentSentToAuthorStage: editorPaymentMirrorValue(
+              "paymentSentToAuthorStage",
+              author.paymentSentToAuthor,
+            ),
+          }
+        : {}),
+    },
   });
   return serialize(row);
 }

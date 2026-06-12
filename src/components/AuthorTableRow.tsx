@@ -6,6 +6,7 @@ import {
   deleteAuthorAction,
   listEditorOutreachAction,
   updateAuthorStageAction,
+  updateEditorStageAction,
   updatePaymentStageAction,
 } from "@/app/actions";
 import type { AuthorRecord } from "@/lib/authors";
@@ -13,9 +14,12 @@ import type { EditorOutreachRecord } from "@/lib/editorOutreach";
 import type { AuthorPaymentDetailsRecord } from "@/lib/paymentDetails";
 import {
   buildAuthorStageCascade,
+  buildEditorPaymentStageCascade,
   buildPaymentStageCascade,
+  isLinkedEditorPaymentField,
   type AuthorStageField,
   type AuthorStages,
+  type EditorStageField,
   type PaymentStageField,
   type PaymentStages,
 } from "@/lib/stages";
@@ -81,10 +85,19 @@ export function AuthorTableRow({ author, onEdit, onDeleted }: Props) {
 
   // Apply a stage cascade locally so the UI updates instantly; the server
   // returns the authoritative state which we use to reconcile on success.
-  // On failure, revert to the previous snapshot.
+  // On failure, revert to the previous snapshot. The linked payment stages
+  // mirror onto every loaded editor card as part of the same cascade.
+  function applyEditorsPatch(patch: Partial<Record<EditorStageField, string>>) {
+    if (Object.keys(patch).length === 0) return;
+    setEditors((prev) =>
+      prev ? prev.map((e) => ({ ...e, ...patch })) : prev,
+    );
+  }
+
   function handleStageUpdate(field: AuthorStageField, value: string) {
     const prevStages = stages;
     const prevPayment = paymentDetails;
+    const prevEditors = editors;
     const cascade = buildAuthorStageCascade(
       field,
       value,
@@ -95,14 +108,17 @@ export function AuthorTableRow({ author, onEdit, onDeleted }: Props) {
     if (Object.keys(cascade.payment).length > 0) {
       setPaymentDetails((p) => ({ ...p, ...cascade.payment }));
     }
+    applyEditorsPatch(cascade.editors);
     startTransition(async () => {
       const r = await updateAuthorStageAction(author.id, field, value);
       if (r.ok) {
         setStages(r.authorStages);
         setPaymentDetails(r.paymentDetails);
+        if (r.editors) setEditors(r.editors);
       } else {
         setStages(prevStages);
         setPaymentDetails(prevPayment);
+        setEditors(prevEditors);
       }
     });
   }
@@ -110,6 +126,7 @@ export function AuthorTableRow({ author, onEdit, onDeleted }: Props) {
   function handlePaymentStageUpdate(field: PaymentStageField, value: string) {
     const prevStages = stages;
     const prevPayment = paymentDetails;
+    const prevEditors = editors;
     const cascade = buildPaymentStageCascade(
       field,
       value,
@@ -120,15 +137,64 @@ export function AuthorTableRow({ author, onEdit, onDeleted }: Props) {
     if (Object.keys(cascade.author).length > 0) {
       setStages((s) => ({ ...s, ...cascade.author }));
     }
+    applyEditorsPatch(cascade.editors);
     startTransition(async () => {
       const r = await updatePaymentStageAction(author.id, field, value);
       if (r.ok) {
         setStages(r.authorStages);
         setPaymentDetails(r.paymentDetails);
+        if (r.editors) setEditors(r.editors);
       } else {
         setStages(prevStages);
         setPaymentDetails(prevPayment);
+        setEditors(prevEditors);
       }
+    });
+  }
+
+  function handleEditorStageUpdate(
+    editor: EditorOutreachRecord,
+    field: EditorStageField,
+    value: string,
+  ) {
+    if (isLinkedEditorPaymentField(field)) {
+      const prevStages = stages;
+      const prevPayment = paymentDetails;
+      const prevEditors = editors;
+      const cascade = buildEditorPaymentStageCascade(
+        field,
+        value,
+        stages,
+        paymentStagesFromRecord(paymentDetails),
+      );
+      setStages((s) => ({ ...s, ...cascade.author }));
+      if (Object.keys(cascade.payment).length > 0) {
+        setPaymentDetails((p) => ({ ...p, ...cascade.payment }));
+      }
+      applyEditorsPatch(cascade.editors);
+      startTransition(async () => {
+        const r = await updateEditorStageAction(editor.id, field, value);
+        if (r.ok) {
+          if (r.authorStages) setStages(r.authorStages);
+          if (r.paymentDetails) setPaymentDetails(r.paymentDetails);
+          if (r.editors) setEditors(r.editors);
+        } else {
+          setStages(prevStages);
+          setPaymentDetails(prevPayment);
+          setEditors(prevEditors);
+        }
+      });
+      return;
+    }
+    const prevEditors = editors;
+    setEditors((prev) =>
+      prev
+        ? prev.map((e) => (e.id === editor.id ? { ...e, [field]: value } : e))
+        : prev,
+    );
+    startTransition(async () => {
+      const r = await updateEditorStageAction(editor.id, field, value);
+      if (!r.ok) setEditors(prevEditors);
     });
   }
 
@@ -285,6 +351,9 @@ export function AuthorTableRow({ author, onEdit, onDeleted }: Props) {
               <EditorOutreachTable
                 authorId={author.id}
                 editors={editors}
+                authorStages={stages}
+                paymentStages={paymentStagesFromRecord(paymentDetails)}
+                onStageUpdate={handleEditorStageUpdate}
                 onEditorAdded={handleEditorAdded}
                 onEditorUpdated={handleEditorUpdated}
                 onEditorDeleted={handleEditorDeleted}

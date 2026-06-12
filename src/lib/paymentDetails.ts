@@ -1,4 +1,5 @@
 import { prisma } from "./db";
+import { listEditorOutreach, type EditorOutreachRecord } from "./editorOutreach";
 import {
   computeNextSendDate,
   isPositiveWholeNumber,
@@ -10,9 +11,11 @@ import {
   AUTHOR_STAGE_FIELDS,
   PAYMENT_STAGE_FIELDS,
   buildAuthorStageCascade,
+  buildEditorPaymentStageCascade,
   buildPaymentStageCascade,
   type AuthorStageField,
   type AuthorStages,
+  type LinkedEditorPaymentField,
   type PaymentStageField,
   type PaymentStages,
   type StageCascade,
@@ -169,6 +172,8 @@ async function readCurrentStages(
 export type StageUpdateResult = {
   paymentDetails: AuthorPaymentDetailsRecord;
   authorStages: AuthorStages;
+  /** Refreshed editor rows when the cascade touched them; null otherwise. */
+  editors: EditorOutreachRecord[] | null;
 };
 
 const AUTHOR_STAGE_SELECT = {
@@ -220,6 +225,16 @@ async function applyCascade(
     });
   }
 
+  // Linked payment stages mirror onto every editor row for the author.
+  let editors: EditorOutreachRecord[] | null = null;
+  if (Object.keys(cascade.editors).length > 0) {
+    await prisma.editorOutreach.updateMany({
+      where: { authorId },
+      data: cascade.editors,
+    });
+    editors = await listEditorOutreach(authorId);
+  }
+
   // Fill in whichever side we didn't write, so the caller gets the full
   // merged state regardless of which half of the cascade had updates.
   if (!authorRow) {
@@ -240,6 +255,7 @@ async function applyCascade(
       ? serializePaymentDetails(paymentRow)
       : defaultPaymentDetailsFor(authorId),
     authorStages: authorRow,
+    editors,
   };
 }
 
@@ -271,6 +287,26 @@ export async function applyAuthorStageUpdate(
     current.payment,
   );
   return applyCascade(authorId, cascade);
+}
+
+export async function applyEditorPaymentStageUpdate(
+  outreachId: string,
+  field: LinkedEditorPaymentField,
+  value: string,
+): Promise<StageUpdateResult> {
+  const outreach = await prisma.editorOutreach.findUnique({
+    where: { id: outreachId },
+    select: { authorId: true },
+  });
+  if (!outreach) throw new Error("Editor outreach not found.");
+  const current = await readCurrentStages(outreach.authorId);
+  const cascade = buildEditorPaymentStageCascade(
+    field,
+    value,
+    current.author,
+    current.payment,
+  );
+  return applyCascade(outreach.authorId, cascade);
 }
 
 // Helps the action layer surface human-readable validation errors.

@@ -337,9 +337,16 @@ export type EditorStages = {
 // predecessor has not reached its unlock value. Checking the predecessor's
 // locked state (not just its value) makes locking cascade: relocking an
 // earlier stage automatically relocks every stage that depends on it.
+//
+// The two payment stages are linked to the author and payment-details chains
+// (see "Cross-chain stage sync" below). When the caller passes that chains'
+// state via `linked`, those two squares take their lock from the author and
+// payment-details gates instead of the editor's own deal-memo stage, so the
+// mirrored values are always visible when the author-level pipeline is open.
 export function editorStageLocked(
   field: EditorStageField,
   stages: EditorStages,
+  linked?: EditorPaymentLockContext,
 ): boolean {
   switch (field) {
     case "proposalStage":
@@ -360,11 +367,23 @@ export function editorStageLocked(
         stages.bidStage !== "bid_received"
       );
     case "paymentReceivedStage":
+      if (linked) {
+        return (
+          authorStageLocked("paymentReceived", linked.author) ||
+          paymentStageLocked("paymentReceivedFromEditorStage", linked.payment)
+        );
+      }
       return (
         editorStageLocked("dealMemoStage", stages) ||
         stages.dealMemoStage !== "accepted"
       );
     case "paymentSentToAuthorStage":
+      if (linked) {
+        return (
+          authorStageLocked("paymentSentToAuthor", linked.author) ||
+          paymentStageLocked("paymentSentToAuthorStage", linked.payment)
+        );
+      }
       return (
         editorStageLocked("paymentReceivedStage", stages) ||
         stages.paymentReceivedStage !== "received"
@@ -381,9 +400,9 @@ export function editorStageLockReason(field: EditorStageField): string {
     case "dealMemoStage":
       return "Unlocks when Bid is Received";
     case "paymentReceivedStage":
-      return "Unlocks when Deal Memo is Accepted";
+      return "Unlocks when Deal Memo Accepted and Contract Signed by All Parties are Completed";
     case "paymentSentToAuthorStage":
-      return "Unlocks when Payment is Received";
+      return "Unlocks when Payment Received is Completed";
     default:
       return "";
   }
@@ -453,22 +472,81 @@ export function paymentStageCssColor(
 
 // ─── Cross-chain stage sync ───────────────────────────────────────────────────
 //
-// Two stages from each chain are "linked":
-//   author.paymentReceived       ↔ payment.paymentReceivedFromEditorStage
-//   author.paymentSentToAuthor   ↔ payment.paymentSentToAuthorStage
+// Two stages are "linked" across all three chains:
+//   author.paymentReceived     ↔ payment.paymentReceivedFromEditorStage ↔ editor.paymentReceivedStage
+//   author.paymentSentToAuthor ↔ payment.paymentSentToAuthorStage       ↔ editor.paymentSentToAuthorStage
 //
-// Linked stages mirror each other for ANY value — Not Started, In Progress,
-// or Completed. Setting one of them propagates the same value to its twin so
-// the two chains never drift on the fields they share. The prior-stage
-// prefix cascade (set all priors on both chains to Completed) still only
-// fires when the source change is to Completed; downgrades don't auto-undo
-// other stages, since the existing lock cascade in the UI already handles
-// the read-only "this is now blocked" affordance.
+// The author and payment chains share a vocabulary and mirror each other for
+// ANY value — Not Started, In Progress, or Completed. The editor stages are
+// binary, so they mirror through a mapping: Completed ⇔ received/sent and any
+// other status ⇔ not_received/not_sent. Editor updates in a cascade apply to
+// EVERY editor row for the author — the linked stages reflect the author-level
+// payment state, not a per-editor one. The prior-stage prefix cascade (set all
+// priors on both the author and payment chains to Completed) still only fires
+// when the source change is to Completed; downgrades don't auto-undo other
+// stages, since the existing lock cascade in the UI already handles the
+// read-only "this is now blocked" affordance.
 
 export type StageCascade = {
   author: Partial<Record<AuthorStageField, string>>;
   payment: Partial<Record<PaymentStageField, string>>;
+  /** Applied to every editor-outreach row belonging to the author. */
+  editors: Partial<Record<EditorStageField, string>>;
 };
+
+/** Author + payment chain state the editor strip needs to resolve its locks. */
+export type EditorPaymentLockContext = {
+  author: AuthorStages;
+  payment: PaymentStages;
+};
+
+export const LINKED_EDITOR_PAYMENT_FIELDS = [
+  "paymentReceivedStage",
+  "paymentSentToAuthorStage",
+] as const;
+
+export type LinkedEditorPaymentField =
+  (typeof LINKED_EDITOR_PAYMENT_FIELDS)[number];
+
+export function isLinkedEditorPaymentField(
+  field: EditorStageField,
+): field is LinkedEditorPaymentField {
+  return (
+    field === "paymentReceivedStage" || field === "paymentSentToAuthorStage"
+  );
+}
+
+/** Editor-vocabulary twin of an author-stage status (Completed ⇒ received/sent). */
+export function editorPaymentMirrorValue(
+  field: LinkedEditorPaymentField,
+  authorStatus: string,
+): string {
+  const done = authorStatus === "completed";
+  if (field === "paymentReceivedStage") {
+    return done ? "received" : "not_received";
+  }
+  return done ? "sent" : "not_sent";
+}
+
+/** Editor updates implied by the author-side fields a cascade touched. */
+function mirrorEditorsFromAuthor(
+  author: Partial<Record<AuthorStageField, string>>,
+): StageCascade["editors"] {
+  const editors: StageCascade["editors"] = {};
+  if (author.paymentReceived !== undefined) {
+    editors.paymentReceivedStage = editorPaymentMirrorValue(
+      "paymentReceivedStage",
+      author.paymentReceived,
+    );
+  }
+  if (author.paymentSentToAuthor !== undefined) {
+    editors.paymentSentToAuthorStage = editorPaymentMirrorValue(
+      "paymentSentToAuthorStage",
+      author.paymentSentToAuthor,
+    );
+  }
+  return editors;
+}
 
 function completePaymentPrefix(
   upToInclusive: PaymentStageField,
@@ -501,8 +579,8 @@ function completeAuthorPrefix(
 /**
  * Closure of updates triggered by setting a payment stage. Always sets the
  * source value; for the two linked stages, mirrors that value to the matching
- * author stage. When the value is "completed", also cascades both chains'
- * prefixes to Completed.
+ * author stage and to every editor's twin. When the value is "completed",
+ * also cascades both chains' prefixes to Completed.
  */
 export function buildPaymentStageCascade(
   source: PaymentStageField,
@@ -530,14 +608,14 @@ export function buildPaymentStageCascade(
       completeAuthorPrefix("paymentSentToAuthor", currentAuthor, author);
     }
   }
-  return { author, payment };
+  return { author, payment, editors: mirrorEditorsFromAuthor(author) };
 }
 
 /**
  * Closure of updates triggered by setting an author stage. Always sets the
  * source value; for the two linked stages, mirrors that value to the matching
- * payment stage. When the value is "completed", also cascades both chains'
- * prefixes to Completed.
+ * payment stage and to every editor's twin. When the value is "completed",
+ * also cascades both chains' prefixes to Completed.
  */
 export function buildAuthorStageCascade(
   source: AuthorStageField,
@@ -575,5 +653,40 @@ export function buildAuthorStageCascade(
       );
     }
   }
-  return { author, payment };
+  return { author, payment, editors: mirrorEditorsFromAuthor(author) };
+}
+
+/**
+ * Closure of updates triggered by setting one of the linked payment stages on
+ * an editor card. The editor value maps onto the author vocabulary
+ * (received/sent ⇒ Completed; not_received/not_sent ⇒ Not Started when the
+ * author side was Completed, otherwise the author side keeps its value) and
+ * then flows through the author cascade so all three chains stay mirrored.
+ * The clicked value is also written explicitly so every editor row re-syncs
+ * even when the author-side value didn't change.
+ */
+export function buildEditorPaymentStageCascade(
+  source: LinkedEditorPaymentField,
+  targetValue: string,
+  currentAuthor: AuthorStages,
+  currentPayment: PaymentStages,
+): StageCascade {
+  const authorField: AuthorStageField =
+    source === "paymentReceivedStage" ? "paymentReceived" : "paymentSentToAuthor";
+  const done =
+    targetValue === (source === "paymentReceivedStage" ? "received" : "sent");
+  const current = currentAuthor[authorField];
+  const mapped = done
+    ? "completed"
+    : current === "completed"
+      ? "not_started"
+      : current;
+  const cascade = buildAuthorStageCascade(
+    authorField,
+    mapped,
+    currentAuthor,
+    currentPayment,
+  );
+  cascade.editors[source] = targetValue;
+  return cascade;
 }

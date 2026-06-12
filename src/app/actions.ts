@@ -20,6 +20,7 @@ import {
 import {
   ContractDetailsValidationError,
   applyAuthorStageUpdate,
+  applyEditorPaymentStageUpdate,
   applyPaymentStageUpdate,
   updateContractDetails,
   type AuthorPaymentDetailsRecord,
@@ -29,6 +30,7 @@ import {
 import { isRenewalIntervalUnit } from "@/lib/royalties";
 import {
   PAYMENT_STAGE_FIELDS,
+  isLinkedEditorPaymentField,
   type AuthorStageField,
   type AuthorStages,
   type EditorStageField,
@@ -113,6 +115,8 @@ export type StageUpdateActionResult =
       ok: true;
       authorStages: AuthorStages;
       paymentDetails: AuthorPaymentDetailsRecord;
+      /** Refreshed editor rows when the cascade touched them; null otherwise. */
+      editors: EditorOutreachRecord[] | null;
     }
   | { ok: false; error: string };
 
@@ -299,7 +303,15 @@ export async function listEditorOutreachAction(
   }
 }
 
-export type UpdateEditorStageResult = { ok: true } | { ok: false; error: string };
+export type UpdateEditorStageResult =
+  | {
+      ok: true;
+      /** Present when a linked payment stage synced the author/payment chains. */
+      authorStages?: AuthorStages;
+      paymentDetails?: AuthorPaymentDetailsRecord;
+      editors?: EditorOutreachRecord[] | null;
+    }
+  | { ok: false; error: string };
 
 export async function updateEditorStageAction(
   outreachId: string,
@@ -307,6 +319,12 @@ export async function updateEditorStageAction(
   value: string,
 ): Promise<UpdateEditorStageResult> {
   try {
+    // The two payment stages are linked across the author, payment-details,
+    // and editor chains — route them through the cross-chain cascade.
+    if (isLinkedEditorPaymentField(field)) {
+      const r = await applyEditorPaymentStageUpdate(outreachId, field, value);
+      return { ok: true, ...r };
+    }
     await updateEditorStage(outreachId, field, value);
     return { ok: true };
   } catch (err) {
