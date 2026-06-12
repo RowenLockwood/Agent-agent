@@ -338,15 +338,13 @@ export type EditorStages = {
 // locked state (not just its value) makes locking cascade: relocking an
 // earlier stage automatically relocks every stage that depends on it.
 //
-// The two payment stages are linked to the author and payment-details chains
-// (see "Cross-chain stage sync" below). When the caller passes that chains'
-// state via `linked`, those two squares take their lock from the author and
-// payment-details gates instead of the editor's own deal-memo stage, so the
-// mirrored values are always visible when the author-level pipeline is open.
+// Locking is local to the editor's own chain. The two payment stages mirror
+// their VALUES across the author and payment-details chains (see "Cross-chain
+// stage sync" below), but no chain gates another's squares — each section
+// stays independently updatable.
 export function editorStageLocked(
   field: EditorStageField,
   stages: EditorStages,
-  linked?: EditorPaymentLockContext,
 ): boolean {
   switch (field) {
     case "proposalStage":
@@ -367,23 +365,11 @@ export function editorStageLocked(
         stages.bidStage !== "bid_received"
       );
     case "paymentReceivedStage":
-      if (linked) {
-        return (
-          authorStageLocked("paymentReceived", linked.author) ||
-          paymentStageLocked("paymentReceivedFromEditorStage", linked.payment)
-        );
-      }
       return (
         editorStageLocked("dealMemoStage", stages) ||
         stages.dealMemoStage !== "accepted"
       );
     case "paymentSentToAuthorStage":
-      if (linked) {
-        return (
-          authorStageLocked("paymentSentToAuthor", linked.author) ||
-          paymentStageLocked("paymentSentToAuthorStage", linked.payment)
-        );
-      }
       return (
         editorStageLocked("paymentReceivedStage", stages) ||
         stages.paymentReceivedStage !== "received"
@@ -400,9 +386,9 @@ export function editorStageLockReason(field: EditorStageField): string {
     case "dealMemoStage":
       return "Unlocks when Bid is Received";
     case "paymentReceivedStage":
-      return "Unlocks when Deal Memo Accepted and Contract Signed by All Parties are Completed";
+      return "Unlocks when Deal Memo is Accepted";
     case "paymentSentToAuthorStage":
-      return "Unlocks when Payment Received is Completed";
+      return "Unlocks when Payment is Received";
     default:
       return "";
   }
@@ -486,18 +472,17 @@ export function paymentStageCssColor(
 // when the source change is to Completed; downgrades don't auto-undo other
 // stages, since the existing lock cascade in the UI already handles the
 // read-only "this is now blocked" affordance.
+//
+// Mirroring is VALUE-only: each chain keeps its own local unlock rules, so no
+// section ever blocks another from being updated. A mirrored value that lands
+// on a square whose own chain hasn't unlocked yet simply stays behind the
+// usual Locked affordance until that chain catches up.
 
 export type StageCascade = {
   author: Partial<Record<AuthorStageField, string>>;
   payment: Partial<Record<PaymentStageField, string>>;
   /** Applied to every editor-outreach row belonging to the author. */
   editors: Partial<Record<EditorStageField, string>>;
-};
-
-/** Author + payment chain state the editor strip needs to resolve its locks. */
-export type EditorPaymentLockContext = {
-  author: AuthorStages;
-  payment: PaymentStages;
 };
 
 export const LINKED_EDITOR_PAYMENT_FIELDS = [

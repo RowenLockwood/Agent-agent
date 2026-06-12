@@ -351,8 +351,6 @@ export function AuthorTableRow({ author, onEdit, onDeleted }: Props) {
               <EditorOutreachTable
                 authorId={author.id}
                 editors={editors}
-                authorStages={stages}
-                paymentStages={paymentStagesFromRecord(paymentDetails)}
                 onStageUpdate={handleEditorStageUpdate}
                 onEditorAdded={handleEditorAdded}
                 onEditorUpdated={handleEditorUpdated}

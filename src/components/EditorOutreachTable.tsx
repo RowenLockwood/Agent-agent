@@ -8,12 +8,7 @@ import {
   updateEditorAction,
 } from "@/app/actions";
 import type { EditorOutreachRecord } from "@/lib/editorOutreach";
-import type {
-  AuthorStages,
-  EditorStageField,
-  EditorStages,
-  PaymentStages,
-} from "@/lib/stages";
+import type { EditorStageField, EditorStages } from "@/lib/stages";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { EditorForm, type EditorFormValues } from "./EditorForm";
 import { EditorStageTimeline } from "./EditorStageTimeline";
@@ -21,9 +16,6 @@ import { EditorStageTimeline } from "./EditorStageTimeline";
 type Props = {
   authorId: string;
   editors: EditorOutreachRecord[];
-  /** Author/payment chain state — drives the linked payment-stage locks. */
-  authorStages: AuthorStages;
-  paymentStages: PaymentStages;
   /** Stage updates are handled by the row, which owns the cross-chain state. */
   onStageUpdate: (
     editor: EditorOutreachRecord,
@@ -38,8 +30,6 @@ type Props = {
 export function EditorOutreachTable({
   authorId,
   editors,
-  authorStages,
-  paymentStages,
   onStageUpdate,
   onEditorAdded,
   onEditorUpdated,
@@ -81,8 +71,6 @@ export function EditorOutreachTable({
             <EditorCard
               key={ed.id}
               editor={ed}
-              authorStages={authorStages}
-              paymentStages={paymentStages}
               onStageUpdate={(field, val) => onStageUpdate(ed, field, val)}
               onUpdated={onEditorUpdated}
               onDeleted={onEditorDeleted}
@@ -132,15 +120,11 @@ export function EditorOutreachTable({
 
 function EditorCard({
   editor,
-  authorStages,
-  paymentStages,
   onStageUpdate,
   onUpdated,
   onDeleted,
 }: {
   editor: EditorOutreachRecord;
-  authorStages: AuthorStages;
-  paymentStages: PaymentStages;
   onStageUpdate: (field: EditorStageField, value: string) => void;
   onUpdated: (updated: EditorOutreachRecord) => void;
   onDeleted: (id: string) => void;
@@ -243,8 +227,6 @@ function EditorCard({
         <EditorStageTimeline
           outreachId={editor.id}
           stages={stages}
-          authorStages={authorStages}
-          paymentStages={paymentStages}
           onUpdate={onStageUpdate}
         />
       )}

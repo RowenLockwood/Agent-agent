@@ -9,28 +9,18 @@ import {
   editorStageLocked,
   editorStageLockReason,
   editorStageValueLabel,
-  type AuthorStages,
   type EditorStageField,
   type EditorStages,
-  type PaymentStages,
 } from "@/lib/stages";
 import { StagePopover } from "./StagePopover";
 
 type Props = {
   outreachId: string;
   stages: EditorStages;
-  /** The linked payment squares take their lock from these chains. */
-  authorStages: AuthorStages;
-  paymentStages: PaymentStages;
   onUpdate: (field: EditorStageField, value: string) => void;
 };
 
-export function EditorStageTimeline({
-  stages,
-  authorStages,
-  paymentStages,
-  onUpdate,
-}: Props) {
+export function EditorStageTimeline({ stages, onUpdate }: Props) {
   return (
     <div
       className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2"
@@ -39,10 +29,7 @@ export function EditorStageTimeline({
     >
       {EDITOR_STAGE_FIELDS.map((field, i) => {
         const value = stages[field] ?? "";
-        const locked = editorStageLocked(field, stages, {
-          author: authorStages,
-          payment: paymentStages,
-        });
+        const locked = editorStageLocked(field, stages);
         const color = editorStageCssColor(field, value, locked);
 
         const square = (
