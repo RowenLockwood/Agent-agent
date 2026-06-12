@@ -67,7 +67,7 @@ export function ContractDetailsBox({
     >
       <header className="flex items-center justify-between mb-3">
         <h3
-          className="smallcaps text-[0.88rem]"
+          className="smallcaps text-[0.94rem]"
           style={{ color: "var(--color-ink-muted)" }}
         >
           Contract Details
@@ -102,7 +102,7 @@ export function ContractDetailsBox({
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.22 }}
-                className="text-[0.85rem] font-serif italic"
+                className="text-[0.9rem] font-serif italic"
                 style={{ color: "var(--color-wine)" }}
               >
                 {errorMessage}
@@ -127,7 +127,7 @@ function SaveStatusPill({ status }: { status: SaveStatus }) {
   return (
     <span
       aria-live="polite"
-      className="smallcaps text-[0.62rem] min-h-[0.9rem] inline-flex"
+      className="smallcaps text-[0.66rem] min-h-[0.9rem] inline-flex"
     >
       <AnimatePresence mode="wait">
         {text && (

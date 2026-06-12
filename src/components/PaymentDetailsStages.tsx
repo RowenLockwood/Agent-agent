@@ -61,9 +61,11 @@ export function PaymentDetailsStages({ stages, onUpdate }: Props) {
             }}
           >
             <span
-              className="smallcaps flex items-center gap-1 text-[0.72rem] leading-tight"
-              // Tighter tracking than .smallcaps so the larger size doesn't wrap stage names.
-              style={{ color: "var(--color-ink-muted)", letterSpacing: "0.06em" }}
+              className="uppercase flex items-center gap-1 text-[0.65rem] leading-tight"
+              // Uppercase, not small-caps: matches the numbered author/editor strips,
+              // where digits have no small-caps form and would render taller than the
+              // name. Tracking stays modest so short names hold a single line.
+              style={{ color: "var(--color-ink-muted)", letterSpacing: "0.04em" }}
             >
               {locked && (
                 <svg
@@ -92,7 +94,7 @@ export function PaymentDetailsStages({ stages, onUpdate }: Props) {
             </span>
             <span className="mt-1 flex items-center gap-1">
               <span
-                className="font-sans text-[0.8rem] font-medium leading-tight"
+                className="font-sans text-[0.85rem] font-medium leading-tight"
                 style={{ color: locked ? "var(--color-ink-muted)" : color }}
               >
                 {locked ? "Locked" : AUTHOR_STAGE_STATUS_LABELS[status]}

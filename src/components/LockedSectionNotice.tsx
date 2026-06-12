@@ -50,13 +50,13 @@ export function LockedSectionNotice({ title, message }: Props) {
       <div className="flex flex-col gap-0.5">
         {title && (
           <span
-            className="smallcaps text-[0.68rem]"
+            className="smallcaps text-[0.72rem]"
             style={{ color: "var(--color-ink-soft)" }}
           >
             {title}
           </span>
         )}
-        <span className="font-serif italic text-[0.92rem] leading-snug">
+        <span className="font-serif italic text-[0.96rem] leading-snug">
           {message}
         </span>
       </div>

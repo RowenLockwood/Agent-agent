@@ -117,7 +117,7 @@ export function RoyaltiesBox({
     >
       <header className="mb-3">
         <h4
-          className="smallcaps text-[0.82rem]"
+          className="smallcaps text-[0.86rem]"
           style={{ color: "var(--color-ink-muted)" }}
         >
           Royalties
@@ -236,21 +236,21 @@ function ReadOnlyRow({
   return (
     <div>
       <div
-        className="smallcaps text-[0.78rem] mb-0.5"
+        className="smallcaps text-[0.82rem] mb-0.5"
         style={{ color: "var(--color-ink-muted)" }}
       >
         {label}
       </div>
       <div className="flex items-center gap-2 flex-wrap">
         <span
-          className="font-serif italic text-[1.05rem] leading-tight"
+          className="font-serif italic text-[1.1rem] leading-tight"
           style={{ color: valueColor }}
         >
           {value}
         </span>
         {badge && (
           <span
-            className="smallcaps text-[0.62rem] px-1.5 py-0.5 rounded-[2px]"
+            className="smallcaps text-[0.66rem] px-1.5 py-0.5 rounded-[2px]"
             style={{
               color: badgeColor ?? "var(--color-ink-muted)",
               border: `1px solid ${badgeColor ?? "var(--color-rule)"}`,

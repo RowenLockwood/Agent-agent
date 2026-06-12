@@ -64,7 +64,7 @@ export function ClientLibrary({
               />
             </div>
             <p
-              className="mt-2 font-sans text-[0.9rem]"
+              className="mt-2 font-sans text-[0.95rem]"
               style={{ color: "var(--color-ink-muted)" }}
             >
               Track authors, submissions, editor interest, deal memos, and
@@ -76,7 +76,7 @@ export function ClientLibrary({
             type="button"
             onClick={openAdd}
             whileTap={{ scale: 0.985 }}
-            className="inline-flex items-center gap-2 px-5 py-2.5 text-[0.85rem] smallcaps text-paper bg-wine hover:bg-wine-deep transition-colors mt-1"
+            className="inline-flex items-center gap-2 px-5 py-2.5 text-[0.88rem] smallcaps text-paper bg-wine hover:bg-wine-deep transition-colors mt-1"
           >
             + Add Author
           </motion.button>
@@ -87,7 +87,7 @@ export function ClientLibrary({
       <div className="flex-1 min-h-0">
         {authorsError && authors.length === 0 ? (
           <div
-            className="px-6 sm:px-10 lg:px-14 py-10 text-[0.9rem] font-sans"
+            className="px-6 sm:px-10 lg:px-14 py-10 text-[0.95rem] font-sans"
             style={{ color: "var(--color-wine)" }}
           >
             {authorsError}
@@ -140,13 +140,13 @@ function EmptyState({ onAddClick }: { onAddClick: () => void }) {
         aria-hidden="true"
       />
       <h2
-        className="font-serif text-[1.5rem] leading-tight"
+        className="font-serif text-[1.55rem] leading-tight"
         style={{ color: "var(--color-ink-soft)" }}
       >
         No authors yet
       </h2>
       <p
-        className="mt-2 text-[0.88rem] font-sans max-w-xs"
+        className="mt-2 text-[0.92rem] font-sans max-w-xs"
         style={{ color: "var(--color-ink-muted)" }}
       >
         Add your first author to begin tracking their publishing pipeline.
@@ -154,7 +154,7 @@ function EmptyState({ onAddClick }: { onAddClick: () => void }) {
       <button
         type="button"
         onClick={onAddClick}
-        className="mt-7 inline-flex items-center gap-2 px-5 py-2.5 text-[0.85rem] smallcaps text-paper bg-wine hover:bg-wine-deep transition-colors"
+        className="mt-7 inline-flex items-center gap-2 px-5 py-2.5 text-[0.88rem] smallcaps text-paper bg-wine hover:bg-wine-deep transition-colors"
       >
         + Add Author
       </button>

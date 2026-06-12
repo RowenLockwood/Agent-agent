@@ -167,13 +167,13 @@ export function AuthorTableRow({ author, onEdit, onDeleted }: Props) {
         <div className="flex flex-wrap items-start justify-between gap-y-3 gap-x-6">
           <div className="flex-1 min-w-0">
             <h3
-              className="font-serif text-[1.35rem] leading-tight"
+              className="font-serif text-[1.45rem] leading-tight"
               style={{ color: "var(--color-ink)" }}
             >
               {author.firstName} {author.lastName}
             </h3>
             <div
-              className="mt-1.5 flex flex-wrap gap-x-4 gap-y-0.5 text-[0.8rem] font-sans"
+              className="mt-1.5 flex flex-wrap gap-x-4 gap-y-0.5 text-[0.85rem] font-sans"
               style={{ color: "var(--color-ink-muted)" }}
             >
               <span>
@@ -202,7 +202,7 @@ export function AuthorTableRow({ author, onEdit, onDeleted }: Props) {
             <button
               type="button"
               onClick={() => onEdit(author)}
-              className="text-[0.76rem] smallcaps transition-colors hover:text-ink"
+              className="text-[0.8rem] smallcaps transition-colors hover:text-ink"
               style={{ color: "var(--color-ink-muted)" }}
             >
               Edit
@@ -211,7 +211,7 @@ export function AuthorTableRow({ author, onEdit, onDeleted }: Props) {
             <button
               type="button"
               onClick={() => setConfirmOpen(true)}
-              className="text-[0.76rem] smallcaps transition-colors hover:text-wine"
+              className="text-[0.8rem] smallcaps transition-colors hover:text-wine"
               style={{ color: "var(--color-ink-muted)" }}
             >
               Delete
@@ -222,7 +222,7 @@ export function AuthorTableRow({ author, onEdit, onDeleted }: Props) {
         {/* Stages */}
         <div className="mt-4">
           <div
-            className="smallcaps text-[0.85rem] mb-2"
+            className="smallcaps text-[0.9rem] mb-2"
             style={{ color: "var(--color-ink-muted)" }}
           >
             Stages
@@ -239,7 +239,7 @@ export function AuthorTableRow({ author, onEdit, onDeleted }: Props) {
           <button
             type="button"
             onClick={handleExpand}
-            className="inline-flex items-center gap-1.5 text-[0.92rem] font-sans transition-colors focus:outline-none focus-visible:underline"
+            className="inline-flex items-center gap-1.5 text-[0.98rem] font-sans transition-colors focus:outline-none focus-visible:underline"
             style={{ color: "var(--color-ink-muted)" }}
             aria-expanded={expanded}
           >
@@ -256,7 +256,7 @@ export function AuthorTableRow({ author, onEdit, onDeleted }: Props) {
               : "Editors"}
           </button>
           {loadError && (
-            <span className="text-[0.78rem]" style={{ color: "var(--color-wine)" }}>
+            <span className="text-[0.82rem]" style={{ color: "var(--color-wine)" }}>
               {loadError}
             </span>
           )}
@@ -276,7 +276,7 @@ export function AuthorTableRow({ author, onEdit, onDeleted }: Props) {
           >
             {editors === null ? (
               <div
-                className="px-6 py-5 text-[0.85rem] italic"
+                className="px-6 py-5 text-[0.9rem] italic"
                 style={{ color: "var(--color-ink-muted)" }}
               >
                 Loading editors…

@@ -51,7 +51,7 @@ export function EditorOutreachTable({
     >
       <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
         <h3
-          className="smallcaps text-[0.85rem]"
+          className="smallcaps text-[0.9rem]"
           style={{ color: "var(--color-ink-muted)" }}
         >
           Editors Reached Out To
@@ -65,7 +65,7 @@ export function EditorOutreachTable({
           <button
             type="button"
             onClick={() => setAdding(true)}
-            className="text-[0.78rem] smallcaps text-paper bg-wine hover:bg-wine-deep transition-colors px-3 py-1.5"
+            className="text-[0.82rem] smallcaps text-paper bg-wine hover:bg-wine-deep transition-colors px-3 py-1.5"
           >
             + Add Editor
           </button>
@@ -87,7 +87,7 @@ export function EditorOutreachTable({
 
         {editors.length === 0 && !adding && (
           <p
-            className="text-[0.85rem] italic py-1"
+            className="text-[0.9rem] italic py-1"
             style={{ color: "var(--color-ink-muted)" }}
           >
             No editors yet — add one to start tracking outreach.
@@ -195,13 +195,13 @@ function EditorCard({
         <div className="flex items-start justify-between gap-4 mb-3">
           <div className="min-w-0">
             <div
-              className="font-serif text-[1.05rem] leading-tight"
+              className="font-serif text-[1.12rem] leading-tight"
               style={{ color: "var(--color-ink)" }}
             >
               {editor.editorFirstName} {editor.editorLastName}
             </div>
             <div
-              className="mt-0.5 flex flex-wrap gap-x-3 text-[0.78rem] font-sans"
+              className="mt-0.5 flex flex-wrap gap-x-3 text-[0.82rem] font-sans"
               style={{ color: "var(--color-ink-muted)" }}
             >
               <span>{editor.publishingHouse}</span>
@@ -212,7 +212,7 @@ function EditorCard({
             <button
               type="button"
               onClick={() => setEditing(true)}
-              className="text-[0.74rem] smallcaps transition-colors hover:text-ink"
+              className="text-[0.78rem] smallcaps transition-colors hover:text-ink"
               style={{ color: "var(--color-ink-muted)" }}
             >
               Edit
@@ -221,7 +221,7 @@ function EditorCard({
             <button
               type="button"
               onClick={() => setConfirmOpen(true)}
-              className="text-[0.74rem] smallcaps transition-colors hover:text-wine"
+              className="text-[0.78rem] smallcaps transition-colors hover:text-wine"
               style={{ color: "var(--color-ink-muted)" }}
             >
               Delete

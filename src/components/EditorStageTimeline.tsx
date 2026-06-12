@@ -50,9 +50,11 @@ export function EditorStageTimeline({ stages, onUpdate }: Props) {
             }}
           >
             <span
-              className="smallcaps flex items-center gap-1 text-[0.72rem] leading-tight"
-              // Tighter tracking than .smallcaps so the larger size doesn't wrap stage names.
-              style={{ color: "var(--color-ink-muted)", letterSpacing: "0.06em" }}
+              className="uppercase flex items-center gap-1 text-[0.65rem] leading-tight"
+              // Uppercase, not small-caps: digits have no small-caps form, so this
+              // keeps the stage number and name the same height. Tracking stays
+              // modest so short names hold a single line.
+              style={{ color: "var(--color-ink-muted)", letterSpacing: "0.04em" }}
             >
               {locked && (
                 <svg width="8" height="8" viewBox="0 0 10 10" aria-hidden="true">
@@ -69,7 +71,7 @@ export function EditorStageTimeline({ stages, onUpdate }: Props) {
             </span>
             <span className="mt-1 flex items-center gap-1">
               <span
-                className="font-sans text-[0.8rem] font-medium leading-tight"
+                className="font-sans text-[0.85rem] font-medium leading-tight"
                 style={{ color: locked ? "var(--color-ink-muted)" : color }}
               >
                 {locked ? "Locked" : editorStageValueLabel(field, value)}
