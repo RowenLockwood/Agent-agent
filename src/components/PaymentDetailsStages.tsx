@@ -2,35 +2,46 @@
 
 import { motion } from "framer-motion";
 import {
-  EDITOR_STAGE_FIELDS,
-  EDITOR_STAGE_FIELD_LABELS,
-  EDITOR_STAGE_OPTIONS,
-  editorStageCssColor,
-  editorStageLocked,
-  editorStageLockReason,
-  editorStageValueLabel,
-  type EditorStageField,
-  type EditorStages,
+  AUTHOR_STAGE_STATUS_LABELS,
+  AUTHOR_STAGE_STATUSES,
+  PAYMENT_STAGE_FIELDS,
+  PAYMENT_STAGE_FIELD_LABELS,
+  authorStageCssColor,
+  paymentStageLocked,
+  paymentStageLockReason,
+  type AuthorStageStatus,
+  type PaymentStageField,
+  type PaymentStages,
 } from "@/lib/stages";
 import { StagePopover } from "./StagePopover";
 
 type Props = {
-  outreachId: string;
-  stages: EditorStages;
-  onUpdate: (field: EditorStageField, value: string) => void;
+  stages: PaymentStages;
+  onUpdate: (field: PaymentStageField, value: string) => void;
 };
 
-export function EditorStageTimeline({ stages, onUpdate }: Props) {
+const OPTIONS = AUTHOR_STAGE_STATUSES.map((s) => ({
+  value: s,
+  label: AUTHOR_STAGE_STATUS_LABELS[s],
+}));
+
+/**
+ * Seven-square payment-stage strip. Visually identical to the author/editor
+ * stage strips (same square card, same lock affordance, same popover) so the
+ * Payment Details dropdown reads as a natural sibling of the existing pieces.
+ */
+export function PaymentDetailsStages({ stages, onUpdate }: Props) {
   return (
     <div
-      className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2"
+      className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-2"
       role="list"
-      aria-label="Editor stages"
+      aria-label="Payment Details stages"
     >
-      {EDITOR_STAGE_FIELDS.map((field, i) => {
-        const value = stages[field] ?? "";
-        const locked = editorStageLocked(field, stages);
-        const color = editorStageCssColor(field, value, locked);
+      {PAYMENT_STAGE_FIELDS.map((field) => {
+        const status = (stages[field] as AuthorStageStatus) ?? "not_started";
+        const locked = paymentStageLocked(field, stages);
+        const color = authorStageCssColor(status, locked);
+        const label = PAYMENT_STAGE_FIELD_LABELS[field];
 
         const square = (
           <motion.span
@@ -67,17 +78,24 @@ export function EditorStageTimeline({ stages, onUpdate }: Props) {
                     stroke="currentColor"
                     strokeWidth="1"
                   />
-                  <rect x="1.5" y="4.5" width="7" height="4.5" rx="0.8" fill="currentColor" />
+                  <rect
+                    x="1.5"
+                    y="4.5"
+                    width="7"
+                    height="4.5"
+                    rx="0.8"
+                    fill="currentColor"
+                  />
                 </svg>
               )}
-              {i + 1}. {EDITOR_STAGE_FIELD_LABELS[field]}
+              {label}
             </span>
             <span className="mt-1.5 flex items-center gap-1">
               <span
                 className="font-sans text-[0.85rem] font-medium leading-tight"
                 style={{ color: locked ? "var(--color-ink-muted)" : color }}
               >
-                {locked ? "Locked" : editorStageValueLabel(field, value)}
+                {locked ? "Locked" : AUTHOR_STAGE_STATUS_LABELS[status]}
               </span>
               {!locked && (
                 <svg
@@ -87,7 +105,13 @@ export function EditorStageTimeline({ stages, onUpdate }: Props) {
                   aria-hidden="true"
                   style={{ color, opacity: 0.55, flexShrink: 0 }}
                 >
-                  <path d="M2.5 4.5L6 8l3.5-3.5" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+                  <path
+                    d="M2.5 4.5L6 8l3.5-3.5"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.4"
+                    strokeLinecap="round"
+                  />
                 </svg>
               )}
             </span>
@@ -99,12 +123,12 @@ export function EditorStageTimeline({ stages, onUpdate }: Props) {
             <StagePopover
               trigger={square}
               triggerClassName="w-full text-left block"
-              options={EDITOR_STAGE_OPTIONS[field]}
-              currentValue={value}
+              options={OPTIONS}
+              currentValue={status}
               onChange={(v) => onUpdate(field, v)}
               locked={locked}
-              lockReason={editorStageLockReason(field)}
-              stageLabel={EDITOR_STAGE_FIELD_LABELS[field]}
+              lockReason={paymentStageLockReason(field)}
+              stageLabel={label}
               disabled={locked}
             />
           </div>

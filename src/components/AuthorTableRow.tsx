@@ -6,13 +6,23 @@ import {
   deleteAuthorAction,
   listEditorOutreachAction,
   updateAuthorStageAction,
+  updatePaymentStageAction,
 } from "@/app/actions";
 import type { AuthorRecord } from "@/lib/authors";
 import type { EditorOutreachRecord } from "@/lib/editorOutreach";
-import type { AuthorStageField } from "@/lib/stages";
+import type { AuthorPaymentDetailsRecord } from "@/lib/paymentDetails";
+import {
+  buildAuthorStageCascade,
+  buildPaymentStageCascade,
+  type AuthorStageField,
+  type AuthorStages,
+  type PaymentStageField,
+  type PaymentStages,
+} from "@/lib/stages";
 import { AuthorStageTimeline } from "./AuthorStageTimeline";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { EditorOutreachTable } from "./EditorOutreachTable";
+import { PaymentDetailsDropdown } from "./PaymentDetailsDropdown";
 
 type Props = {
   author: AuthorRecord;
@@ -20,10 +30,9 @@ type Props = {
   onDeleted: (id: string) => void;
 };
 
-type AuthorStages = Record<AuthorStageField, string>;
-
 function stagesFromAuthor(a: AuthorRecord): AuthorStages {
   return {
+    authorOnboarded: a.authorOnboarded,
     proposalSentToEditors: a.proposalSentToEditors,
     authorMeetings: a.authorMeetings,
     bidSent: a.bidSent,
@@ -34,8 +43,23 @@ function stagesFromAuthor(a: AuthorRecord): AuthorStages {
   };
 }
 
+function paymentStagesFromRecord(p: AuthorPaymentDetailsRecord): PaymentStages {
+  return {
+    contractSentToEditorStage: p.contractSentToEditorStage,
+    backAndForthWithEditorStage: p.backAndForthWithEditorStage,
+    contractSignedByAuthorStage: p.contractSignedByAuthorStage,
+    contractSignedByEditorStage: p.contractSignedByEditorStage,
+    contractSignedByAllPartiesStage: p.contractSignedByAllPartiesStage,
+    paymentReceivedFromEditorStage: p.paymentReceivedFromEditorStage,
+    paymentSentToAuthorStage: p.paymentSentToAuthorStage,
+  };
+}
+
 export function AuthorTableRow({ author, onEdit, onDeleted }: Props) {
   const [stages, setStages] = useState<AuthorStages>(stagesFromAuthor(author));
+  const [paymentDetails, setPaymentDetails] = useState<AuthorPaymentDetailsRecord>(
+    author.paymentDetails,
+  );
   const [expanded, setExpanded] = useState(false);
   const [editors, setEditors] = useState<EditorOutreachRecord[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -55,12 +79,56 @@ export function AuthorTableRow({ author, onEdit, onDeleted }: Props) {
     }
   }
 
+  // Apply a stage cascade locally so the UI updates instantly; the server
+  // returns the authoritative state which we use to reconcile on success.
+  // On failure, revert to the previous snapshot.
   function handleStageUpdate(field: AuthorStageField, value: string) {
-    const prev = stages[field];
-    setStages((s) => ({ ...s, [field]: value }));
+    const prevStages = stages;
+    const prevPayment = paymentDetails;
+    const cascade = buildAuthorStageCascade(
+      field,
+      value,
+      stages,
+      paymentStagesFromRecord(paymentDetails),
+    );
+    setStages((s) => ({ ...s, ...cascade.author }));
+    if (Object.keys(cascade.payment).length > 0) {
+      setPaymentDetails((p) => ({ ...p, ...cascade.payment }));
+    }
     startTransition(async () => {
       const r = await updateAuthorStageAction(author.id, field, value);
-      if (!r.ok) setStages((s) => ({ ...s, [field]: prev }));
+      if (r.ok) {
+        setStages(r.authorStages);
+        setPaymentDetails(r.paymentDetails);
+      } else {
+        setStages(prevStages);
+        setPaymentDetails(prevPayment);
+      }
+    });
+  }
+
+  function handlePaymentStageUpdate(field: PaymentStageField, value: string) {
+    const prevStages = stages;
+    const prevPayment = paymentDetails;
+    const cascade = buildPaymentStageCascade(
+      field,
+      value,
+      paymentStagesFromRecord(paymentDetails),
+      stages,
+    );
+    setPaymentDetails((p) => ({ ...p, ...cascade.payment }));
+    if (Object.keys(cascade.author).length > 0) {
+      setStages((s) => ({ ...s, ...cascade.author }));
+    }
+    startTransition(async () => {
+      const r = await updatePaymentStageAction(author.id, field, value);
+      if (r.ok) {
+        setStages(r.authorStages);
+        setPaymentDetails(r.paymentDetails);
+      } else {
+        setStages(prevStages);
+        setPaymentDetails(prevPayment);
+      }
     });
   }
 
@@ -99,7 +167,7 @@ export function AuthorTableRow({ author, onEdit, onDeleted }: Props) {
         <div className="flex flex-wrap items-start justify-between gap-y-3 gap-x-6">
           <div className="flex-1 min-w-0">
             <h3
-              className="font-serif text-[1.35rem] leading-tight"
+              className="font-serif text-[1.25rem] leading-tight"
               style={{ color: "var(--color-ink)" }}
             >
               {author.firstName} {author.lastName}
@@ -152,10 +220,10 @@ export function AuthorTableRow({ author, onEdit, onDeleted }: Props) {
         </div>
 
         {/* Stages */}
-        <div className="mt-4">
+        <div className="mt-5">
           <div
-            className="smallcaps text-[0.65rem] mb-2"
-            style={{ color: "var(--color-ink-muted)" }}
+            className="smallcaps text-[0.82rem] mb-2.5"
+            style={{ color: "var(--color-ink-soft)" }}
           >
             Stages
           </div>
@@ -171,8 +239,8 @@ export function AuthorTableRow({ author, onEdit, onDeleted }: Props) {
           <button
             type="button"
             onClick={handleExpand}
-            className="inline-flex items-center gap-1.5 text-[0.78rem] font-sans transition-colors focus:outline-none focus-visible:underline"
-            style={{ color: "var(--color-ink-muted)" }}
+            className="inline-flex items-center gap-1.5 text-[0.92rem] font-sans font-medium transition-colors focus:outline-none focus-visible:underline"
+            style={{ color: "var(--color-ink-soft)" }}
             aria-expanded={expanded}
           >
             <motion.span
@@ -225,6 +293,16 @@ export function AuthorTableRow({ author, onEdit, onDeleted }: Props) {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Payment Details — sibling of the editors dropdown, independently collapsible. */}
+      <div className="px-4 sm:px-6 pb-5">
+        <PaymentDetailsDropdown
+          authorId={author.id}
+          paymentDetails={paymentDetails}
+          onPaymentStageUpdate={handlePaymentStageUpdate}
+          onPaymentDetailsChange={setPaymentDetails}
+        />
+      </div>
 
       <ConfirmDialog
         open={confirmOpen}

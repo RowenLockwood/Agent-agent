@@ -78,3 +78,17 @@ textarea:-webkit-autofill {
   -webkit-box-shadow: 0 0 0px 1000px var(--color-paper) inset;
   -webkit-text-fill-color: var(--color-ink);
 }
+
+/* Payment email template canvas (contentEditable). The placeholder uses
+   ::before so it never participates in editing or serialization. A div the
+   user has emptied may retain a stray <br>, hence the :has() variant. */
+.plato-canvas {
+  caret-color: var(--color-wine);
+}
+.plato-canvas:empty::before,
+.plato-canvas:has(> br:only-child)::before {
+  content: "Start typing your email body — drag fields from the palette to insert them anywhere.";
+  font-style: italic;
+  color: rgba(74,68,60,0.55);
+  pointer-events: none;
+}
