@@ -49,9 +49,9 @@ export function EditorOutreachTable({
       className="border-t px-4 sm:px-6 py-4"
       style={{ borderColor: "var(--color-rule-soft)" }}
     >
-      <div className="flex items-center justify-between mb-3">
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
         <h3
-          className="smallcaps text-[0.72rem]"
+          className="smallcaps text-[0.85rem]"
           style={{ color: "var(--color-ink-muted)" }}
         >
           Editors Reached Out To

@@ -85,7 +85,7 @@ export function CommissionBox({
     >
       <header className="mb-2">
         <h4
-          className="smallcaps text-[0.72rem]"
+          className="smallcaps text-[0.82rem]"
           style={{ color: "var(--color-ink-muted)" }}
         >
           Commission

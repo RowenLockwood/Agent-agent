@@ -50,8 +50,9 @@ export function EditorStageTimeline({ stages, onUpdate }: Props) {
             }}
           >
             <span
-              className="smallcaps flex items-center gap-1 text-[0.58rem] leading-tight"
-              style={{ color: "var(--color-ink-muted)" }}
+              className="smallcaps flex items-center gap-1 text-[0.72rem] leading-tight"
+              // Tighter tracking than .smallcaps so the larger size doesn't wrap stage names.
+              style={{ color: "var(--color-ink-muted)", letterSpacing: "0.06em" }}
             >
               {locked && (
                 <svg width="8" height="8" viewBox="0 0 10 10" aria-hidden="true">

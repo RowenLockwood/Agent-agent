@@ -222,7 +222,7 @@ export function AuthorTableRow({ author, onEdit, onDeleted }: Props) {
         {/* Stages */}
         <div className="mt-4">
           <div
-            className="smallcaps text-[0.65rem] mb-2"
+            className="smallcaps text-[0.85rem] mb-2"
             style={{ color: "var(--color-ink-muted)" }}
           >
             Stages
@@ -239,7 +239,7 @@ export function AuthorTableRow({ author, onEdit, onDeleted }: Props) {
           <button
             type="button"
             onClick={handleExpand}
-            className="inline-flex items-center gap-1.5 text-[0.78rem] font-sans transition-colors focus:outline-none focus-visible:underline"
+            className="inline-flex items-center gap-1.5 text-[0.92rem] font-sans transition-colors focus:outline-none focus-visible:underline"
             style={{ color: "var(--color-ink-muted)" }}
             aria-expanded={expanded}
           >
