@@ -858,6 +858,26 @@ const TemplateCanvas = forwardRef<CanvasHandle, {
   // changes from OUTSIDE this component (initial mount, "Start from Plato
   // Default" preload, programmatic chip insert).
   const lastRenderedBodyRef = useRef<string>("");
+  // Last selection observed INSIDE the canvas. Clicking or dragging from the
+  // palette moves focus and may collapse the live selection, so "replace the
+  // highlighted placeholder with this field" needs the selection remembered
+  // from before the gesture started. Ranges live-adjust with DOM mutations,
+  // so the memory stays valid while the user types elsewhere.
+  const selectionMemory = useRef<Range | null>(null);
+
+  useEffect(() => {
+    function remember() {
+      const root = editorRef.current;
+      const sel = window.getSelection();
+      if (!root || !sel || sel.rangeCount === 0) return;
+      const r = sel.getRangeAt(0);
+      if (root.contains(r.startContainer) && root.contains(r.endContainer)) {
+        selectionMemory.current = r.cloneRange();
+      }
+    }
+    document.addEventListener("selectionchange", remember);
+    return () => document.removeEventListener("selectionchange", remember);
+  }, []);
 
   useEffect(() => {
     if (!editorRef.current) return;
@@ -899,12 +919,19 @@ const TemplateCanvas = forwardRef<CanvasHandle, {
     insertField(key: string) {
       const root = editorRef.current;
       if (!root) return;
-      // Use the active selection if it's inside the canvas; otherwise append.
+      // Prefer the live in-canvas selection, then the remembered one (focus
+      // has usually moved to the palette button by now), then append.
       const sel = window.getSelection();
       let range: Range | null = null;
       if (sel && sel.rangeCount > 0 && root.contains(sel.anchorNode)) {
         range = sel.getRangeAt(0).cloneRange();
+      } else if (
+        selectionMemory.current &&
+        root.contains(selectionMemory.current.startContainer)
+      ) {
+        range = selectionMemory.current.cloneRange();
       }
+      selectionMemory.current = null;
       // Refocus so subsequent typing lands in the right place.
       root.focus();
       insertChipAt(range, key);
@@ -919,31 +946,42 @@ const TemplateCanvas = forwardRef<CanvasHandle, {
     if (!root) return;
     // Resolve the drop point to a range. caretRangeFromPoint is the WebKit /
     // Blink API; caretPositionFromPoint is the standardized one Firefox
-    // implements. Either works here.
+    // implements. Must be invoked ON document — a detached reference throws
+    // "Illegal invocation".
+    const doc = document as Document & {
+      caretRangeFromPoint?(x: number, y: number): Range | null;
+      caretPositionFromPoint?(
+        x: number,
+        y: number,
+      ): { offsetNode: Node; offset: number } | null;
+    };
     let range: Range | null = null;
-    const docCaretRangeFromPoint = (
-      document as unknown as {
-        caretRangeFromPoint?: (x: number, y: number) => Range | null;
-      }
-    ).caretRangeFromPoint;
-    const docCaretPositionFromPoint = (
-      document as unknown as {
-        caretPositionFromPoint?: (
-          x: number,
-          y: number,
-        ) => { offsetNode: Node; offset: number } | null;
-      }
-    ).caretPositionFromPoint;
-    if (typeof docCaretRangeFromPoint === "function") {
-      range = docCaretRangeFromPoint(e.clientX, e.clientY);
-    } else if (typeof docCaretPositionFromPoint === "function") {
-      const pos = docCaretPositionFromPoint(e.clientX, e.clientY);
+    if (typeof doc.caretRangeFromPoint === "function") {
+      range = doc.caretRangeFromPoint(e.clientX, e.clientY);
+    } else if (typeof doc.caretPositionFromPoint === "function") {
+      const pos = doc.caretPositionFromPoint(e.clientX, e.clientY);
       if (pos) {
         range = document.createRange();
         range.setStart(pos.offsetNode, pos.offset);
         range.collapse(true);
       }
     }
+    // If the user dropped onto text they had highlighted (e.g.
+    // "[author name]" in pasted copy), replace the whole selection rather
+    // than inserting at the bare drop point. The live selection is often
+    // gone by drop time, so consult the remembered one.
+    const remembered = selectionMemory.current;
+    if (
+      remembered &&
+      !remembered.collapsed &&
+      root.contains(remembered.startContainer) &&
+      range &&
+      root.contains(range.startContainer) &&
+      remembered.comparePoint(range.startContainer, range.startOffset) === 0
+    ) {
+      range = remembered.cloneRange();
+    }
+    selectionMemory.current = null;
     root.focus();
     insertChipAt(range, key);
   }
@@ -996,30 +1034,15 @@ const TemplateCanvas = forwardRef<CanvasHandle, {
         }}
         onDrop={onDrop}
         data-plato-canvas="true"
+        aria-label="Email body editor"
+        role="textbox"
+        aria-multiline="true"
         className="plato-canvas mt-4 min-h-[14rem] bg-paper border border-rule-soft px-5 py-4 font-serif text-[1.05rem] leading-[1.75] text-ink whitespace-pre-wrap focus:outline-none focus:border-ink/60 transition-colors"
         style={{ wordBreak: "break-word" }}
       />
-      {/* Empty-state placeholder. We render this outside the editor so
-          contentEditable doesn't capture or pollute it. */}
-      <PlatoCanvasPlaceholder body={draft.body} />
     </section>
   );
 });
-
-function PlatoCanvasPlaceholder({ body }: { body: BodySegment[] }) {
-  const isEmpty =
-    body.length === 0 ||
-    (body.length === 1 && body[0].t === "text" && !body[0].v.trim());
-  if (!isEmpty) return null;
-  return (
-    <p
-      aria-hidden="true"
-      className="mt-[-12rem] mb-[10.5rem] mx-5 italic text-ink-muted/70 pointer-events-none"
-    >
-      Start typing your email body — drag fields from the palette to insert them anywhere.
-    </p>
-  );
-}
 
 function findChipBefore(range: Range): HTMLElement | null {
   let node: Node | null = range.startContainer;

@@ -169,54 +169,75 @@ function rowToRecord(row: TemplateRow): PaymentEmailTemplateRecord {
 }
 
 /**
- * Seed the protected Plato Default if it isn't on disk yet. Safe to call on
- * every read — the upsert uses a fixed id so we can never produce duplicates.
+ * Seed the protected Plato Default if it isn't on disk yet, and heal a
+ * partially-seeded one (parent row written, children missing — the state a
+ * crashed seed leaves behind, since HTTP mode has no transactions to roll
+ * back the parent).
+ *
+ * IMPORTANT (Neon HTTP adapter): `createMany` and `updateMany` open an
+ * implicit transaction in Prisma's query compiler and fail over HTTP with
+ * "Transactions are not supported in HTTP mode" — even for a single row.
+ * Single-row `create`/`update`/`delete`/`deleteMany` and reads (including
+ * relation `include`) are single-statement and safe. Verified empirically
+ * against prisma@7.8.0 + @prisma/adapter-neon@7.8.0; see
+ * scripts/check-neon-http-compat.ts.
  */
 async function ensureSystemDefault(): Promise<TemplateRow> {
   const existing = await prisma.paymentEmailTemplate.findUnique({
     where: { id: SYSTEM_DEFAULT_TEMPLATE_ID },
     include: TEMPLATE_INCLUDE,
   });
-  if (existing) return existing as unknown as TemplateRow;
-
-  // Sequential writes — Neon's HTTP adapter is unreliable with mixed-model
-  // nested creates in a single statement (same issue we hit on payment
-  // details). Seed the parent first, then the children explicitly.
   const seed = buildSystemDefaultRecord();
-  await prisma.paymentEmailTemplate.create({
-    data: {
-      id: SYSTEM_DEFAULT_TEMPLATE_ID,
-      name: seed.name,
-      description: seed.description,
-      subjectLine: seed.subjectLine,
-      tokenizedBody: JSON.stringify(seed.body),
-      plainTextBodyFallback: bodyToFallback(seed.body, [], []),
-      isSystemDefault: true,
-      isAgencyDefault: false,
-      isActive: true,
-      versionNumber: 1,
-    },
-  });
+  const intact =
+    existing &&
+    existing.calculatedFields.length >= seed.calculatedFields.length &&
+    existing.summaryFields.length >= seed.summaryFields.length;
+  if (intact) return existing as unknown as TemplateRow;
 
-  if (seed.calculatedFields.length > 0) {
-    await prisma.paymentEmailCalculatedField.createMany({
-      data: seed.calculatedFields.map((c) => ({
+  if (!existing) {
+    await prisma.paymentEmailTemplate.create({
+      data: {
+        id: SYSTEM_DEFAULT_TEMPLATE_ID,
+        name: seed.name,
+        description: seed.description,
+        subjectLine: seed.subjectLine,
+        tokenizedBody: JSON.stringify(seed.body),
+        plainTextBodyFallback: bodyToFallback(seed.body, [], []),
+        isSystemDefault: true,
+        isAgencyDefault: false,
+        isActive: true,
+        versionNumber: 1,
+      },
+    });
+  }
+
+  // (Re)build the children from the seed spec. deleteMany keeps this
+  // idempotent when healing a partial seed.
+  await prisma.paymentEmailCalculatedField.deleteMany({
+    where: { templateId: SYSTEM_DEFAULT_TEMPLATE_ID },
+  });
+  await prisma.paymentEmailSummaryField.deleteMany({
+    where: { templateId: SYSTEM_DEFAULT_TEMPLATE_ID },
+  });
+  for (const c of seed.calculatedFields) {
+    await prisma.paymentEmailCalculatedField.create({
+      data: {
         templateId: SYSTEM_DEFAULT_TEMPLATE_ID,
         fieldKey: c.fieldKey,
         label: c.label,
         outputType: c.outputType,
         expressionTree: serializeTreeForStorage(parseFormula(c.tokens)),
-      })),
+      },
     });
   }
-  if (seed.summaryFields.length > 0) {
-    await prisma.paymentEmailSummaryField.createMany({
-      data: seed.summaryFields.map((s, i) => ({
+  for (const [i, s] of seed.summaryFields.entries()) {
+    await prisma.paymentEmailSummaryField.create({
+      data: {
         templateId: SYSTEM_DEFAULT_TEMPLATE_ID,
         fieldKey: s.fieldKey,
         summaryLabel: s.summaryLabel,
         displayOrder: i,
-      })),
+      },
     });
   }
 
@@ -331,13 +352,15 @@ export async function createTemplate(
   return rowToRecord(fresh as unknown as TemplateRow);
 }
 
+// Per-row creates, NOT createMany — see the Neon HTTP note on
+// ensureSystemDefault.
 async function writeTemplateChildren(
   templateId: string,
   input: TemplateDraftInput,
 ): Promise<void> {
-  if (input.customFields.length > 0) {
-    await prisma.paymentEmailCustomField.createMany({
-      data: input.customFields.map((cf) => ({
+  for (const cf of input.customFields) {
+    await prisma.paymentEmailCustomField.create({
+      data: {
         templateId,
         fieldKey: cf.fieldKey,
         label: cf.label,
@@ -347,28 +370,28 @@ async function writeTemplateChildren(
         defaultValue: cf.defaultValue,
         dropdownOptions:
           cf.fieldType === "dropdown" ? JSON.stringify(cf.dropdownOptions) : null,
-      })),
+      },
     });
   }
-  if (input.calculatedFields.length > 0) {
-    await prisma.paymentEmailCalculatedField.createMany({
-      data: input.calculatedFields.map((c) => ({
+  for (const c of input.calculatedFields) {
+    await prisma.paymentEmailCalculatedField.create({
+      data: {
         templateId,
         fieldKey: c.fieldKey,
         label: c.label,
         outputType: c.outputType,
         expressionTree: serializeTreeForStorage(parseFormula(c.tokens)),
-      })),
+      },
     });
   }
-  if (input.summaryFields.length > 0) {
-    await prisma.paymentEmailSummaryField.createMany({
-      data: input.summaryFields.map((s, i) => ({
+  for (const [i, s] of input.summaryFields.entries()) {
+    await prisma.paymentEmailSummaryField.create({
+      data: {
         templateId,
         fieldKey: s.fieldKey,
         summaryLabel: s.summaryLabel,
         displayOrder: i,
-      })),
+      },
     });
   }
 }
@@ -465,10 +488,18 @@ export async function setAgencyDefault(
   const target = await prisma.paymentEmailTemplate.findUnique({ where: { id } });
   if (!target) throw new Error("Template not found.");
 
-  await prisma.paymentEmailTemplate.updateMany({
+  // updateMany opens an implicit transaction (fails on Neon HTTP) — clear
+  // existing defaults one by one. There's at most one in practice.
+  const currentDefaults = await prisma.paymentEmailTemplate.findMany({
     where: { isAgencyDefault: true, NOT: { id } },
-    data: { isAgencyDefault: false },
+    select: { id: true },
   });
+  for (const row of currentDefaults) {
+    await prisma.paymentEmailTemplate.update({
+      where: { id: row.id },
+      data: { isAgencyDefault: false },
+    });
+  }
   await prisma.paymentEmailTemplate.update({
     where: { id },
     data: { isAgencyDefault: true },
