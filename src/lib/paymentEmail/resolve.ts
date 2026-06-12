@@ -167,6 +167,15 @@ export function resolveFieldValues(ctx: RenderContext): ResolvedValues {
       raw = override ? override : readCrm(f, ctx);
     }
 
+    // Final fallback: the registry's declared default. Without this,
+    // standard inputs like Commission Type (defaultValue: "advance") would
+    // render as a [Commission Type] placeholder in the email even though the
+    // composition form shows "advance" pre-selected in the dropdown — the
+    // form's UI default never made it back into the rendered value.
+    if (raw == null && f.defaultValue) {
+      raw = f.defaultValue;
+    }
+
     if (f.valueType === "currency" || f.valueType === "percentage" || f.valueType === "number") {
       const n = parseNumeric(raw ?? undefined);
       numeric.set(f.key, n);
