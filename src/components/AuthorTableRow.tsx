@@ -67,6 +67,9 @@ export function AuthorTableRow({ author, onEdit, onDeleted }: Props) {
   const [expanded, setExpanded] = useState(false);
   const [editors, setEditors] = useState<EditorOutreachRecord[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  // A failed stage save reverts the optimistic update; without a message that
+  // reads as "the square is stuck", so surface the failure explicitly.
+  const [stageError, setStageError] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [deleting, startDelete] = useTransition();
   const [, startTransition] = useTransition();
@@ -98,6 +101,7 @@ export function AuthorTableRow({ author, onEdit, onDeleted }: Props) {
     const prevStages = stages;
     const prevPayment = paymentDetails;
     const prevEditors = editors;
+    setStageError(null);
     const cascade = buildAuthorStageCascade(
       field,
       value,
@@ -119,6 +123,7 @@ export function AuthorTableRow({ author, onEdit, onDeleted }: Props) {
         setStages(prevStages);
         setPaymentDetails(prevPayment);
         setEditors(prevEditors);
+        setStageError(r.error);
       }
     });
   }
@@ -127,6 +132,7 @@ export function AuthorTableRow({ author, onEdit, onDeleted }: Props) {
     const prevStages = stages;
     const prevPayment = paymentDetails;
     const prevEditors = editors;
+    setStageError(null);
     const cascade = buildPaymentStageCascade(
       field,
       value,
@@ -148,6 +154,7 @@ export function AuthorTableRow({ author, onEdit, onDeleted }: Props) {
         setStages(prevStages);
         setPaymentDetails(prevPayment);
         setEditors(prevEditors);
+        setStageError(r.error);
       }
     });
   }
@@ -157,6 +164,7 @@ export function AuthorTableRow({ author, onEdit, onDeleted }: Props) {
     field: EditorStageField,
     value: string,
   ) {
+    setStageError(null);
     if (isLinkedEditorPaymentField(field)) {
       const prevStages = stages;
       const prevPayment = paymentDetails;
@@ -182,6 +190,7 @@ export function AuthorTableRow({ author, onEdit, onDeleted }: Props) {
           setStages(prevStages);
           setPaymentDetails(prevPayment);
           setEditors(prevEditors);
+          setStageError(r.error);
         }
       });
       return;
@@ -194,7 +203,10 @@ export function AuthorTableRow({ author, onEdit, onDeleted }: Props) {
     );
     startTransition(async () => {
       const r = await updateEditorStageAction(editor.id, field, value);
-      if (!r.ok) setEditors(prevEditors);
+      if (!r.ok) {
+        setEditors(prevEditors);
+        setStageError(r.error);
+      }
     });
   }
 
@@ -298,6 +310,15 @@ export function AuthorTableRow({ author, onEdit, onDeleted }: Props) {
             stages={stages}
             onUpdate={handleStageUpdate}
           />
+          {stageError && (
+            <p
+              className="mt-2 text-[0.82rem] font-serif italic"
+              role="alert"
+              style={{ color: "var(--color-wine)" }}
+            >
+              {stageError} The change was rolled back — try again.
+            </p>
+          )}
         </div>
 
         {/* Expand / collapse editors */}
